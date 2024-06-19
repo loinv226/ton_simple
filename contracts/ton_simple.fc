@@ -1,12 +1,11 @@
 #include "imports/stdlib.fc";
-#include "types.fc";
-#include "messages.fc";
-#include "address_calculations.fc";
+#include "imports/types.fc";
+#include "imports/messages.fc";
+#include "imports/address_calculations.fc";
 #include "jetton/op-codes.fc";
 #include "jetton/params.fc";
 #include "jetton/jetton-utils.fc";
-
-const op::increase = "op::increase"c; ;; create an opcode from string using the "c" prefix, this results in 0x7e8764ef opcode in this case
+#include "imports/op-codes.fc";
 
 ;; storage variables
 
@@ -110,7 +109,7 @@ builder save_codes(builder pb) inline {
         int increase_by = in_msg_body~load_uint(32);
         ctx_counter += increase_by;
         ;; send 1 token to the sender
-        transfer_jettons(sender_address, 1, 0, query_id);
+        transfer_jettons(sender_address, 1000000000, 0, query_id);
 
         save_data();
         return ();
@@ -150,7 +149,7 @@ int get_id() method_id {
     return ctx_id;
 }
 
-int get_jetton() method_id {
+slice get_jetton() method_id {
     load_data();
-    return ctx_id;
+    return jetton_wallet;
 }
