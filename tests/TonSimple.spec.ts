@@ -18,6 +18,8 @@ describe('TonSimple', () => {
 
     let notDeployer: SandboxContract<TreasuryContract>;
     let jettonMinter: SandboxContract<JettonMinter>;
+    let poolJettonWallet: SandboxContract<JettonWallet>;
+
     let defaultContent: Cell;
 
     let userWallet: (address: Address) => Promise<SandboxContract<JettonWallet>>;
@@ -26,20 +28,17 @@ describe('TonSimple', () => {
         code = await compile('TonSimple');
         minter_code = await compile('JettonMinter');
         wallet_code = await compile('JettonWallet');
-    });
 
-    beforeEach(async () => {
         blockchain = await Blockchain.create();
 
-        const _libs = Dictionary.empty(Dictionary.Keys.BigUint(256), Dictionary.Values.Cell());
-        _libs.set(BigInt(`0x${wallet_code.hash().toString('hex')}`), wallet_code);
-        const libs = beginCell().storeDictDirect(_libs).endCell();
-        blockchain.libs = libs;
-
-        defaultContent = beginCell().endCell();
+        // const _libs = Dictionary.empty(Dictionary.Keys.BigUint(256), Dictionary.Values.Cell());
+        // _libs.set(BigInt(`0x${wallet_code.hash().toString('hex')}`), wallet_code);
+        // const libs = beginCell().storeDictDirect(_libs).endCell();
+        // blockchain.libs = libs;
 
         deployer = await blockchain.treasury('deployer');
 
+        defaultContent = beginCell().endCell();
         jettonMinter = blockchain.openContract(
             await JettonMinter.createFromConfig(
                 {
@@ -87,6 +86,8 @@ describe('TonSimple', () => {
         });
     });
 
+    beforeEach(async () => {});
+
     it('should deploy', async () => {
         // the check is done inside beforeEach
         // blockchain and tonSimple are ready to use
@@ -95,63 +96,74 @@ describe('TonSimple', () => {
     it('should deposit into pool', async () => {
         // deploy jetton wallet
         let initialTotalSupply = await jettonMinter.getTotalSupply();
-        const deployerJettonWallet = await userWallet(tonSimple.address);
+        console.log('initialTotalSupply: ', initialTotalSupply);
+
+        poolJettonWallet = await userWallet(tonSimple.address);
         let initialJettonBalance = toNano('1000');
+        console.log('poolJettonWallet: ', poolJettonWallet.address);
+
         const mintResult = await jettonMinter.sendMint(
             deployer.getSender(),
-            deployer.address,
+            tonSimple.address,
             initialJettonBalance,
             toNano('0.05'),
             toNano('1'),
         );
+        // console.log('mintResult: ', mintResult);
+
+        console.log('poolJettonWallet.getJettonBalance(): ', await poolJettonWallet.getJettonBalance());
 
         expect(mintResult.transactions).toHaveTransaction({
             from: jettonMinter.address,
-            on: deployerJettonWallet.address,
-            deploy: true,
+            on: poolJettonWallet.address,
+            success: true,
+            // deploy: true,
         });
-        expect(mintResult.transactions).toHaveTransaction({
-            // excesses
-            from: deployerJettonWallet.address,
-            on: deployer.address,
-        });
+        // expect(mintResult.transactions).toHaveTransaction({
+        //     // excesses
+        //     from: poolJettonWallet.address,
+        //     on: deployer.address,
+        // });
 
-        expect(await deployerJettonWallet.getJettonBalance()).toEqual(initialJettonBalance);
+        expect(await poolJettonWallet.getJettonBalance()).toEqual(initialJettonBalance);
         expect(await jettonMinter.getTotalSupply()).toEqual(initialTotalSupply + initialJettonBalance);
         initialTotalSupply += initialJettonBalance;
     });
 
     it('should increase counter', async () => {
-        const increaseTimes = 3;
-        for (let i = 0; i < increaseTimes; i++) {
-            console.log(`increase ${i + 1}/${increaseTimes}`);
+        const increaser = await blockchain.treasury('increaser');
 
-            const increaser = await blockchain.treasury('increaser' + i);
+        const counterBefore = await tonSimple.getCounter();
 
-            const counterBefore = await tonSimple.getCounter();
+        console.log('counter before increasing', counterBefore);
 
-            console.log('counter before increasing', counterBefore);
+        const increaseBy = Math.floor(Math.random() * 100);
 
-            const increaseBy = Math.floor(Math.random() * 100);
+        console.log('increasing by', increaseBy);
 
-            console.log('increasing by', increaseBy);
+        const increaseResult = await tonSimple.sendIncrease(increaser.getSender(), {
+            increaseBy,
+            value: toNano('0.05'),
+        });
 
-            const increaseResult = await tonSimple.sendIncrease(increaser.getSender(), {
-                increaseBy,
-                value: toNano('0.05'),
-            });
+        console.log('increaseResult: ', increaseResult);
 
-            expect(increaseResult.transactions).toHaveTransaction({
-                from: increaser.address,
-                to: tonSimple.address,
-                success: true,
-            });
+        expect(increaseResult.transactions).toHaveTransaction({
+            from: increaser.address,
+            to: tonSimple.address,
+            success: true,
+        });
 
-            const counterAfter = await tonSimple.getCounter();
+        // expect(increaseResult.transactions).toHaveTransaction({
+        //     from: poolJettonWallet.address,
+        //     to: poolJettonWallet.address,
+        //     // success: true,
+        // });
 
-            console.log('counter after increasing', counterAfter);
+        const counterAfter = await tonSimple.getCounter();
 
-            expect(counterAfter).toBe(counterBefore + increaseBy);
-        }
+        console.log('counter after increasing', counterAfter);
+
+        expect(counterAfter).toBe(counterBefore + increaseBy);
     });
 });

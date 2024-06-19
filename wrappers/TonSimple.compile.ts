@@ -4,13 +4,13 @@ export const compile: CompilerConfig = {
     lang: 'func',
     targets: [
         'contracts/imports/stdlib.fc',
-        'contracts/types.fc',
-        'contracts/messages.fc',
-        'contracts/address_calculations.fc',
-        'contracts/ton_simple.fc',
+        'contracts/imports/types.fc',
+        'contracts/imports/messages.fc',
+        'contracts/imports/address_calculations.fc',
         'contracts/jetton/op-codes.fc',
         'contracts/jetton/params.fc',
         'contracts/jetton/jetton-utils.fc',
+        'contracts/imports/op-codes.fc',
         'contracts/ton_simple.fc',
     ],
 };
