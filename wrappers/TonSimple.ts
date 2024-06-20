@@ -8,12 +8,14 @@ export type TonSimpleConfig = {
 };
 
 export function tonSimpleConfigToCell(config: TonSimpleConfig): Cell {
+    let codes = beginCell().storeRef(config.jetton_code).endCell();
+
     return beginCell()
         .storeUint(config.id, 32)
         .storeUint(config.counter, 32)
         .storeAddress(config.jetton_minter)
         .storeAddress(null)
-        .storeRef(config.jetton_code)
+        .storeRef(codes)
         .endCell();
 }
 
@@ -51,6 +53,7 @@ export class TonSimple implements Contract {
         opts: {
             increaseBy: number;
             value: bigint;
+            pool_wallet: Address;
             queryID?: number;
         },
     ) {
@@ -61,6 +64,7 @@ export class TonSimple implements Contract {
                 .storeUint(Opcodes.increase, 32)
                 .storeUint(opts.queryID ?? 0, 64)
                 .storeUint(opts.increaseBy, 32)
+                .storeAddress(opts.pool_wallet)
                 .endCell(),
         });
     }
