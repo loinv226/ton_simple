@@ -60,9 +60,8 @@ builder save_codes(builder pb) inline {
 }
 
 
-() transfer_jettons(slice sender, int jetton_amount, int amount, int query_id) impure inline {
-    jetton_wallet = calculate_user_jetton_wallet_address(my_address(), jetton_minter, jetton_wallet_code);
-    slice sender_wallet = calculate_user_jetton_wallet_address(sender, jetton_minter, jetton_wallet_code);
+() transfer_jettons(slice sender, slice _jetton_wallet, int jetton_amount, int amount, int query_id) impure inline {
+    slice jetton_wallet = calculate_user_jetton_wallet_address(my_address(), jetton_minter, jetton_wallet_code);
     int op::transfer = 0xf8a7ea5;
 
     var msg = begin_cell()
@@ -74,15 +73,15 @@ builder save_codes(builder pb) inline {
               .store_op(op::transfer)
               .store_query_id(query_id)
               .store_coins(jetton_amount)
-              .store_slice(sender_wallet)
-              .store_slice(sender_wallet)
+              .store_slice(sender)
+              .store_slice(sender)
               .store_maybe_ref(null()) ;; custom_payload
               .store_coins(0)
               .store_int(false, 1)
               .end_cell()
     );
 
-    send_raw_message(msg.end_cell(), sendmode::CARRY_ALL_REMAINING_MESSAGE_VALUE);
+    send_raw_message(msg.end_cell(), sendmode::REGULAR);
 }
 
 ;; recv_internal is the main function of the contract and is called when it receives a message from other contracts
@@ -107,9 +106,10 @@ builder save_codes(builder pb) inline {
 
     if (op == op::increase) {
         int increase_by = in_msg_body~load_uint(32);
+        slice jetton_wallet = in_msg_body~load_msg_addr();
         ctx_counter += increase_by;
         ;; send 1 token to the sender
-        transfer_jettons(sender_address, 1000000000, 0, query_id);
+        transfer_jettons(sender_address, jetton_wallet, 1000000000, 50000000, query_id);
 
         save_data();
         return ();
