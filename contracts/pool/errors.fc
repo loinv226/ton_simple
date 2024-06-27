@@ -1,0 +1,6 @@
+const WRONG_OP = 0xffff;
+const WRONG_WORKCHAIN = 333;
+
+const INVALID_CALL = 90;
+const INVALID_AMOUNT = 91;
+const INVALID_PARAMS = 92;

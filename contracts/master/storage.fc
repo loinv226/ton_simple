@@ -1,0 +1,80 @@
+#include "../imports/stdlib.fc";
+
+;; storage variables
+global int ctx_id;
+
+;; master config
+global slice fee_receiver;
+global int creation_fee;
+global int native_fee_percent;
+global int token_fee_percent;
+global int native_fee_only_percent;
+;; global cell operators;
+;; global cell currencies;
+
+;; pool
+global cell pool_code;
+global slice authority;
+
+(slice, ()) ~load_master_config(slice s) inline {
+    slice ds = s~load_ref().begin_parse();
+
+    ;; fee_receiver = ds~load_msg_addr();
+    ;; creation_fee = ds~load_uint(64);
+    ;; native_fee_percent = ds~load_uint(8);
+    ;; token_fee_percent = ds~load_uint(8);
+    native_fee_only_percent = ds~load_uint(8);
+    ;; operators = ds~load_dict();
+    ;; currencies = ds~load_dict();
+
+    return (s, ());
+}
+
+builder store_master_config(builder b) inline {
+    cell configCell = begin_cell()
+     .store_slice(fee_receiver)
+     .store_coins(creation_fee)
+     .store_uint(native_fee_percent, 8)
+     .store_uint(token_fee_percent, 8)
+     .store_uint(native_fee_only_percent, 8)
+    ;;  .store_dict(operators)
+    ;;  .store_dict(currencies)
+     .end_cell();
+
+    return b.store_ref(configCell);
+}
+
+(slice, ()) ~load_codes(slice s) impure inline {
+    slice ds = s~load_ref().begin_parse();
+    pool_code = ds~load_ref();
+    return (s, ());
+}
+
+builder save_codes(builder pb) inline {
+    cell codes = begin_cell()
+                 .store_ref(pool_code)
+                 .end_cell();
+    return pb.store_ref(codes);
+}
+
+;; load_data populates storage variables using stored data
+() load_data() impure {
+    var ds = get_data().begin_parse();
+
+    ctx_id = ds~load_uint(32);
+    ds~load_master_config();
+    ds~load_codes();
+
+    ds.end_parse();
+}
+
+;; save_data stores storage variables as a cell into persistent storage
+() save_data() impure {
+    set_data(
+        begin_cell()
+            .store_uint(ctx_id, 32)
+            .store_master_config()
+            .save_codes()
+            .end_cell()
+    );
+}

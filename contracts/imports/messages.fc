@@ -21,7 +21,7 @@ builder store_msg_flags(builder b, int msg_flag) inline { return b.store_uint(ms
 
 -}
 
-builder store_msgbody_prefix_stateinit(builder b, cell state_init, cell ref) inline {
+builder store_msgbody_prefix_stateinit_ref(builder b, cell state_init, cell ref) inline {
     return b.store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1).store_ref(state_init).store_ref(ref);
 }
 
@@ -59,6 +59,25 @@ builder store_masterchain_address(builder b, int address_hash) inline {
         msg = msg.store_msgbody_prefix_ref(payload);
     } else {
         msg = msg.store_msgbody_prefix_slice();
+    }
+
+    send_raw_message(msg.end_cell(), send_mode);
+}
+
+() send_msg_with_state_init(slice to_address, int amount, cell state_init, cell payload, int flags, int send_mode) impure inline_ref {
+    int has_payload = ~ cell_null?(payload);
+
+    builder msg = begin_cell()
+        .store_msg_flags(flags)
+        .store_slice(to_address)
+        .store_coins(amount);
+
+    if (has_payload) {
+        msg = msg
+        .store_msgbody_prefix_stateinit_ref(state_init, payload);
+    } else {
+        msg = msg
+        .store_msgbody_prefix_stateinit_slice(state_init);
     }
 
     send_raw_message(msg.end_cell(), send_mode);

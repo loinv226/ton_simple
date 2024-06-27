@@ -1,0 +1,130 @@
+#include "imports/stdlib.fc";
+#include "imports/types.fc";
+#include "imports/messages.fc";
+#include "imports/address.fc";
+#include "jetton/params.fc";
+#include "imports/jetton_utils.fc";
+#include "master/op.fc";
+#include "master/storage.fc";
+#include "master/errors.fc";
+#include "master/util.fc";
+
+;; recv_internal is the main function of the contract and is called when it receives a message from other contracts
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore all empty messages
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+
+    slice sender_address = cs~load_msg_addr();
+    cs~load_msg_addr();
+    cs~load_coins(); ;;
+    cs~skip_bits(1); ;; extracurrency
+    cs~load_coins(); ;; ihr_fee
+    int fwd_fee = cs~load_coins();
+    
+    load_data(); ;; here we populate the storage variables
+
+    int op = in_msg_body~load_uint(32); ;; by convention, the first 32 bits of incoming message is the op
+    int query_id = in_msg_body~load_uint(64); ;; also by convention, the next 64 bits contain the "query id", although this is not always the case
+
+    if (op == transfer_notification) {
+
+        (
+            int jetton_amount,
+            slice owner
+        ) = (
+            in_msg_body~load_coins(), 
+            in_msg_body~load_msg_addr()
+        );
+        throw_unless(INVALID_AMOUNT, jetton_amount > 0);
+
+            
+        int fwd_count = 4;
+        if ((fwd_fee * fwd_count >  msg_value)) {
+            ;; refund jettons
+            var body = create_simple_transfer_body(query_id, 0, jetton_amount, owner);
+            send_msg(sender_address, 0, body.end_cell(), msgflag::BOUNCEABLE, sendmode::CARRY_ALL_REMAINING_MESSAGE_VALUE);
+            return ();
+        }
+
+        cell ref_cs = in_msg_body~load_ref(); 
+        slice ref_ds = ref_cs.begin_parse();
+        
+        (int op_fwd, slice currency_vault) = (ref_ds~load_uint(32), ref_ds~load_msg_addr());
+            
+        force_chain(currency_vault);
+            
+        if (op_fwd == op::init_pool) {
+
+            cell param_cs = ref_ds~load_ref();
+            cell body_param = param_cs;
+            slice params_ds = param_cs.begin_parse();
+        
+            ;; slice token_mint, not need
+            ;; slice currency_mint, not need
+            
+            (
+                int start_time,
+                int end_time,
+                int public_sale_start_time,
+                int min_contribution,
+                int max_contribution,
+                int soft_cap,
+                int hard_cap,
+                int rate,
+                int listing_percentage,
+                int refund_type,
+                int use_native_fee_only
+            ) = (
+                params_ds~load_uint(64),
+                params_ds~load_uint(64),
+                params_ds~load_uint(64),
+                params_ds~load_coins(),
+                params_ds~load_coins(),
+                params_ds~load_coins(),
+                params_ds~load_coins(),
+                params_ds~load_uint(32),
+                params_ds~load_uint(8),
+                params_ds~load_uint(8),
+                params_ds~load_uint(1)
+            );
+            
+            ;; Todo: check logic here
+            throw_unless(INVALID_PARAMS, validate_pool_data());
+        
+            (cell state_init, slice pool_address) = get_pool_state_init_and_address(sender_address, currency_vault);
+
+            ;; create new pool
+            builder msg_body = begin_cell()
+                    .store_uint(op::init_pool, 32)
+                    .store_uint(query_id, 64)
+                    .store_slice(owner)
+                    .store_coins(jetton_amount)
+                    .store_ref(body_param);
+
+            send_msg_with_state_init(pool_address, 0, state_init, msg_body.end_cell(), msgflag::BOUNCEABLE, sendmode::CARRY_ALL_REMAINING_MESSAGE_VALUE);
+            return ();
+        }
+            
+        return ();
+    }
+
+    throw(WRONG_OP);
+}
+
+;; get methods are a means to conveniently read contract data using, for example, HTTP APIs
+int get_id() method_id {
+    load_data();
+    return ctx_id;
+}
+
+cell get_pool_code() method_id {
+    load_data();
+    return pool_code;
+}

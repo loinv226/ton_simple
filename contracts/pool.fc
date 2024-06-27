@@ -1,0 +1,67 @@
+#include "imports/stdlib.fc";
+#include "imports/types.fc";
+#include "imports/messages.fc";
+#include "imports/address.fc";
+#include "jetton/op-codes.fc";
+#include "jetton/params.fc";
+#include "jetton/jetton-utils.fc";
+#include "pool/storage.fc";
+#include "pool/op.fc";
+#include "pool/errors.fc";
+
+;; recv_internal is the main function of the contract and is called when it receives a message from other contracts
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore all empty messages
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+
+    slice sender_address = cs~load_msg_addr();
+
+    load_data(); ;; here we populate the storage variables
+
+
+    int op = in_msg_body~load_uint(32); 
+    int query_id = in_msg_body~load_uint(64);
+
+    if (op == op::init_pool) { 
+        (slice owner_addr, int amount0, cell params) = (in_msg_body~load_msg_addr(), in_msg_body~load_coins(), in_msg_body~load_ref());
+
+        slice params_cs = params.begin_parse();
+        ;; index = 0;
+        ;; token_mint = params~load_slice(); not need
+        ;; currency_mint = params~load_slice(); not need
+        authority = owner_addr;
+        start_time = params_cs~load_uint(64);
+        end_time = params_cs~load_uint(64);
+        public_sale_start_time = params_cs~load_uint(64);
+        min_contribution = params_cs~load_coins();
+        max_contribution = params_cs~load_coins();
+        soft_cap = params_cs~load_coins();
+        hard_cap = params_cs~load_coins();
+        rate = params_cs~load_uint(32);
+        listing_percentage = params_cs~load_uint(8);
+        refund_type = params_cs~load_uint(8);
+        params_cs~load_uint(1); ;;use_native_fee_only
+        ;; native_fee_percent = params_cs~load_uint();
+        ;; token_fee_percent = params_cs~load_uint();
+        
+        save_data();
+
+        return ();
+    }
+
+    throw(WRONG_OP);
+}
+
+;; get methods
+
+slice get_jetton() method_id {
+    load_data();
+    return jetton_wallet;
+}

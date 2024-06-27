@@ -1,0 +1,11 @@
+const transfer = 0xf8a7ea5;
+const transfer_notification = 0x7362d09c;
+
+const op::init_pool = "::init_pool"c;
+const op::contribute = "::contribute"c;
+
+const op::cancel = "op::cancel"c;
+const op::claim = "op::claim"c;
+const op::emergency_withdraw = "op::emergency_withdraw"c;
+const op::finalize = "op::finalize"c;
+
