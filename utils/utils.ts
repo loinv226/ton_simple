@@ -1,6 +1,6 @@
 import { Address, toNano, fromNano } from 'ton';
 import { Cell, beginCell, Transaction } from 'ton-core';
-import { JettonWallet } from './JettonWallet';
+import { JettonWallet } from '../wrappers/JettonWallet';
 import { SandboxContract, TreasuryContract } from '@ton-community/sandbox';
 
 export type ActiveWallet = SandboxContract<TreasuryContract>;

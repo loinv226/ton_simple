@@ -20,7 +20,12 @@ export function tonSimpleConfigToCell(config: TonSimpleConfig): Cell {
 }
 
 export const Opcodes = {
-    increase: 0x7e8764ef,
+    init_pool: 0x38032463,
+    contribute: 0x86c74136,
+    cancel: 0xcc0f2526,
+    claim: 0x13a3ca6,
+    emergency_withdraw: 0xf129aa95,
+    finalize: 0x5b07133a,
 };
 
 export class TonSimple implements Contract {

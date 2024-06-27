@@ -1,21 +1,26 @@
 import { toNano } from '@ton/core';
-import { TonSimple } from '../wrappers/TonSimple';
+import { Master } from '../wrappers/Master';
 import { compile, NetworkProvider } from '@ton/blueprint';
 
 export async function run(provider: NetworkProvider) {
-    const tonSimple = provider.open(
-        TonSimple.createFromConfig(
+    const master = provider.open(
+        Master.createFromConfig(
             {
                 id: Math.floor(Math.random() * 10000),
-                counter: 0,
+                creationFee: 0,
+                feeReceiver: provider.sender().address!,
+                nativeFeeOnlyPercent: 0,
+                nativeFeePercent: 0,
+                poolCode: await compile('Pool'),
+                tokenFeePercent: 0,
             },
-            await compile('TonSimple')
-        )
+            await compile('Master'),
+        ),
     );
 
-    await tonSimple.sendDeploy(provider.sender(), toNano('0.05'));
+    await master.sendDeploy(provider.sender(), toNano('0.05'));
 
-    await provider.waitForDeploy(tonSimple.address);
+    await provider.waitForDeploy(master.address);
 
-    console.log('ID', await tonSimple.getID());
+    console.log('ID', await master.getID());
 }
