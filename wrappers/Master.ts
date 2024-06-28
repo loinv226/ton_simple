@@ -126,4 +126,12 @@ export class Master implements Contract {
         const result = await provider.get('get_id', []);
         return result.stack.readNumber();
     }
+
+    async getPoolAddress(provider: ContractProvider, token_vault: Address, currency_vault: Address) {
+        const result = await provider.get('get_pool_address', [
+            { type: 'slice', cell: beginCell().storeAddress(token_vault).endCell() },
+            { type: 'slice', cell: beginCell().storeAddress(currency_vault).endCell() },
+        ]);
+        return result.stack.readAddress();
+    }
 }

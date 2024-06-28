@@ -5,8 +5,6 @@ import '@ton/test-utils';
 import { compile } from '@ton/blueprint';
 import { JettonMinter } from '../wrappers/JettonMinter';
 import { JettonWallet } from '../wrappers/JettonWallet';
-import { ActiveJettonWallet } from '../utils/utils';
-import { createJettonTransferMessage } from '../utils/jetton_utils';
 
 describe('Master', () => {
     let code: Cell;
@@ -40,11 +38,6 @@ describe('Master', () => {
         wallet_code = await compile('JettonWallet');
 
         blockchain = await Blockchain.create();
-
-        // const _libs = Dictionary.empty(Dictionary.Keys.BigUint(256), Dictionary.Values.Cell());
-        // _libs.set(BigInt(`0x${wallet_code.hash().toString('hex')}`), wallet_code);
-        // const libs = beginCell().storeDictDirect(_libs).endCell();
-        // blockchain.libs = libs;
 
         deployer = await blockchain.treasury('deployer');
         notDeployer = await blockchain.treasury('notDeployer');
@@ -171,7 +164,7 @@ describe('Master', () => {
         // blockchain and master are ready to use
     });
 
-    it('should init pool success', async () => {
+    it('should master init pool success ', async () => {
         tokenVaultWallet = await tokenWallet(master.address);
         currencyVaultWallet = await currencyWallet(master.address);
 
@@ -204,7 +197,7 @@ describe('Master', () => {
         // });
 
         // transfer
-        await deployerJettonWallet.sendTransfer(
+        const transferResult = await deployerJettonWallet.sendTransfer(
             deployer.getSender(),
             gasAmount,
             poolInitAmount,
@@ -218,5 +211,14 @@ describe('Master', () => {
         console.log('balance: ', balance);
 
         expect(balance).toEqual(poolInitAmount);
+
+        const poolAddress = await master.getPoolAddress(tokenVaultWallet.address, currencyVaultWallet.address);
+        console.log('poolAddress: ', poolAddress);
+
+        expect(transferResult.transactions).toHaveTransaction({
+            from: master.address,
+            on: poolAddress,
+            deploy: true,
+        });
     });
 });
