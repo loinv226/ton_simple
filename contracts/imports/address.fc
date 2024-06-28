@@ -7,7 +7,8 @@ slice addr_none() asm "b{00} PUSHSLICE";
 builder store_zeros(builder b, int n) asm "STZEROES";
 
 slice calc_address(int workchain, cell state_init) inline {
-    return begin_cell().store_uint(4, 3) ;; 0x100 : $10 + anycast (Maybe = 0)
+    return begin_cell()
+            .store_uint(4, 3) ;; 0x100 : $10 + anycast (Maybe = 0)
             .store_workchain(workchain)
             .store_uint(cell_hash(state_init), 256)
             .end_cell()

@@ -99,16 +99,19 @@
             throw_unless(INVALID_PARAMS, validate_pool_data());
         
             (cell state_init, slice pool_address) = get_pool_state_init_and_address(sender_address, currency_vault);
-
+            
             ;; create new pool
             builder msg_body = begin_cell()
                     .store_uint(op::init_pool, 32)
                     .store_uint(query_id, 64)
-                    .store_slice(owner)
                     .store_coins(jetton_amount)
+                    .store_slice(owner)
                     .store_ref(body_param);
+            ~dump(jetton_amount);
 
             send_msg_with_state_init(pool_address, 0, state_init, msg_body.end_cell(), msgflag::BOUNCEABLE, sendmode::CARRY_ALL_REMAINING_MESSAGE_VALUE);
+            ~dump(slice_hash(pool_address));
+            
             return ();
         }
             
@@ -127,4 +130,10 @@ int get_id() method_id {
 cell get_pool_code() method_id {
     load_data();
     return pool_code;
+}
+
+slice get_pool_address(slice token_vault, slice currency_vault) method_id {
+    load_data();
+    (_, slice pool_address) = get_pool_state_init_and_address(token_vault, currency_vault);
+    return pool_address;
 }

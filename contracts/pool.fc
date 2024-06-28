@@ -20,17 +20,17 @@
     if (flags & 1) { ;; ignore all bounced messages
         return ();
     }
-
+    
     slice sender_address = cs~load_msg_addr();
 
     load_data(); ;; here we populate the storage variables
-
 
     int op = in_msg_body~load_uint(32); 
     int query_id = in_msg_body~load_uint(64);
 
     if (op == op::init_pool) { 
-        (slice owner_addr, int amount0, cell params) = (in_msg_body~load_msg_addr(), in_msg_body~load_coins(), in_msg_body~load_ref());
+        (int amount0, slice owner_addr, cell params) = (in_msg_body~load_coins(), in_msg_body~load_msg_addr(), in_msg_body~load_ref());
+        ~dump(params);
 
         slice params_cs = params.begin_parse();
         ;; index = 0;
