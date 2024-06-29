@@ -1,0 +1,26 @@
+#include "../imports/stdlib.fc";
+
+global slice user_address;
+global slice pool_address; 
+global int contribute_amount;
+global int purchased_amount;   
+global int claimed_amount;    
+
+() load_data() impure inline {
+    slice ds = get_data().begin_parse();
+    user_address = ds~load_msg_addr();
+    pool_address = ds~load_msg_addr(); 
+    contribute_amount = ds~load_coins();
+    purchased_amount = ds~load_coins();
+    claimed_amount = ds~load_coins();
+}
+
+() save_data() impure inline {
+    set_data(begin_cell()
+        .store_slice(user_address)
+        .store_slice(pool_address)
+        .store_coins(contribute_amount)
+        .store_coins(purchased_amount)
+        .store_coins(claimed_amount)
+    .end_cell());
+}

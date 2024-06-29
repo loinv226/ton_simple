@@ -1,0 +1,20 @@
+cell pack_contributor_data(slice user_address, slice pool_address) inline_ref {
+    return begin_cell()
+        .store_slice(user_address)
+        .store_slice(pool_address)
+        .store_coins(0)
+        .store_coins(0)
+        .store_coins(0)
+    .end_cell();
+}
+
+(cell, slice) get_contributor_state_init_and_address(slice user_address, slice pool_address) inline {
+    cell state_init = begin_cell()
+        .store_uint(0, 1 + 1)
+        .store_maybe_ref(contributor_code)
+        .store_maybe_ref(pack_contributor_data(user_address, pool_address))
+        .store_uint(0, 1) ;; lib
+        .end_cell();
+    
+    return (state_init, calc_address(WORKCHAIN, state_init));
+}

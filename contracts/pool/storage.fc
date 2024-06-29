@@ -33,9 +33,9 @@ global int finish_time;
 global int claim_time;
 
 ;; jetton
-global slice jetton_minter;
-global slice jetton_wallet;
-global cell jetton_wallet_code;
+;; global slice jetton_minter;
+;; global slice jetton_wallet;
+global cell contributor_code;
 
 (slice, ()) ~load_pool_setting(slice s) inline {
     slice ds = s~load_ref().begin_parse();
@@ -133,13 +133,13 @@ builder store_state(builder b) inline {
 
 (slice, ()) ~load_codes(slice s) impure inline {
     slice ds = s~load_ref().begin_parse();
-    jetton_wallet_code = ds~load_ref();
+    contributor_code = ds~load_ref();
     return (s, ());
 }
 
 builder save_codes(builder pb) inline {
     cell codes = begin_cell()
-                 .store_ref(jetton_wallet_code)
+                 .store_ref(contributor_code)
                  .end_cell();
     return pb.store_ref(codes);
 }
@@ -159,7 +159,7 @@ builder save_codes(builder pb) inline {
     ;; jetton_minter = ds~load_msg_addr();
     ;; jetton_wallet = ds~load_msg_addr();
 
-    ;; ds~load_codes();
+    ds~load_codes();
 
     ds.end_parse();
 }
@@ -175,7 +175,7 @@ builder save_codes(builder pb) inline {
             .store_slice(master_address)
         ;; .store_slice(jetton_minter)
         ;; .store_slice(jetton_wallet)
-        ;; .save_codes()
+            .save_codes()
             .end_cell()
     );
 }

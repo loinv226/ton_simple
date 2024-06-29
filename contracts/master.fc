@@ -2,7 +2,7 @@
 #include "imports/types.fc";
 #include "imports/messages.fc";
 #include "imports/address.fc";
-#include "jetton/params.fc";
+#include "imports/util.fc";
 #include "imports/jetton_utils.fc";
 #include "master/op.fc";
 #include "master/storage.fc";
@@ -21,14 +21,16 @@
         return ();
     }
 
+    load_data(); ;; here we populate the storage variables
+
     slice sender_address = cs~load_msg_addr();
+    force_chain(sender_address);
+
     cs~load_msg_addr();
     cs~load_coins(); ;;
     cs~skip_bits(1); ;; extracurrency
     cs~load_coins(); ;; ihr_fee
     int fwd_fee = cs~load_coins();
-    
-    load_data(); ;; here we populate the storage variables
 
     int op = in_msg_body~load_uint(32); ;; by convention, the first 32 bits of incoming message is the op
     int query_id = in_msg_body~load_uint(64); ;; also by convention, the next 64 bits contain the "query id", although this is not always the case
@@ -56,11 +58,13 @@
         cell ref_cs = in_msg_body~load_ref(); 
         slice ref_ds = ref_cs.begin_parse();
         
-        (int op_fwd, slice currency_vault) = (ref_ds~load_uint(32), ref_ds~load_msg_addr());
+        int op_fwd = ref_ds~load_uint(32);
             
-        force_chain(currency_vault);
             
         if (op_fwd == op::init_pool) {
+            slice currency_vault =  ref_ds~load_msg_addr();
+            force_chain(currency_vault);
+
 
             cell param_cs = ref_ds~load_ref();
             cell body_param = param_cs;
@@ -114,7 +118,40 @@
             
             return ();
         }
+
+        if (op_fwd == op::contribute) {
+            slice token_vault =  ref_ds~load_msg_addr();
+            ;;  Todo: handle proof
+            (int index, int tier) = (ref_ds~load_uint(64), ref_ds~load_uint(64));
+            ;; Check some logic
+
+            (_, slice pool_address) = get_pool_state_init_and_address(token_vault, sender_address);
             
+            builder msg_body = begin_cell()
+                    .store_uint(op::contribute, 32)
+                    .store_uint(query_id, 64)
+                    .store_coins(jetton_amount)
+                    .store_slice(owner)
+                    .store_uint(index, 64)
+                    .store_uint(tier, 64);
+            ~dump(jetton_amount);
+
+            send_msg(pool_address, 0, msg_body.end_cell(), msgflag::BOUNCEABLE, sendmode::CARRY_ALL_REMAINING_MESSAGE_VALUE);
+            
+            return ();
+        }
+            
+        return ();
+    }
+
+    if (op == op::purchase) {
+        (int purchase_amount, slice owner, slice token_wallet) = (in_msg_body~load_coins(), in_msg_body~load_msg_addr(), in_msg_body~load_msg_addr()); 
+        
+        if (purchase_amount > 0) {
+            var body = create_simple_transfer_body(query_id, 0, purchase_amount, owner);
+            send_msg(token_wallet, 0, body.end_cell(), msgflag::BOUNCEABLE, sendmode::CARRY_ALL_REMAINING_MESSAGE_VALUE | sendmode::IGNORE_ERRORS);
+        }
+
         return ();
     }
 
