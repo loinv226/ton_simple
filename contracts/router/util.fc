@@ -1,0 +1,75 @@
+builder store_setting(builder b, slice token_vault, slice currency_vault) inline {
+    var settingBuilder = begin_cell().store_uint(0, 2);; save pool_authority
+    .store_ref(
+        begin_cell()
+            .store_uint(0, 2)
+            .store_uint(0, 2)
+            .end_cell()
+    );; save token_mint and currency_mint
+    .store_ref(
+        begin_cell()
+            .store_slice(token_vault)
+            .store_slice(currency_vault)
+            .end_cell()
+    );; save token_vault and currency_vault
+    .store_uint(0, 64) ;; start_time
+    .store_uint(0, 64) ;; end_time
+    .store_uint(0, 64) ;; public_sale_start_time
+    .store_coins(0) ;; min_contribution
+    .store_coins(0) ;; max_contribution
+    .store_coins(0) ;; soft_cap
+    .store_coins(0) ;; hard_cap
+
+    .store_uint(0, 32) ;; rate
+    .store_uint(0, 8) ;; listing_percentage
+    .store_uint(0, 8) ;; refund_type
+    .store_uint(0, 8) ;; native_fee_percent
+    .store_uint(0, 8); ;; token_fee_percent
+
+    return b.store_ref(settingBuilder.end_cell());
+}
+
+builder store_state(builder b) inline {
+    var stateBuilder = begin_cell()
+    .store_uint(0, 8) ;; state
+    .store_coins(0) ;; total_raised
+    .store_coins(0) ;; total_volume_purchased
+    .store_uint(0, 32) ;; purchaser_count
+    .store_uint(0, 64) ;; finish_time
+    .store_uint(0, 64); ;; claim_time
+
+    return b.store_ref(stateBuilder.end_cell());
+}
+
+builder save_pool_codes(builder pb) inline {
+    cell codes = begin_cell()
+                 .store_ref(contributor_code)
+                 .end_cell();
+    return pb.store_ref(codes);
+}
+
+cell pack_pool_data(slice token_vault, slice currency_vault) inline_ref {
+    return begin_cell()
+            .store_uint(0, 32) ;; index
+            .store_uint(0, 8) ;; version
+            .store_slice(my_address())
+            .store_setting(token_vault, currency_vault)
+            .store_state()
+            .save_pool_codes()
+            .end_cell();
+}
+
+(cell, slice) get_pool_state_init_and_address(slice token_vault, slice currency_vault) inline {
+    cell state_init = begin_cell()
+        .store_uint(0, 1 + 1)
+        .store_maybe_ref(pool_code)
+        .store_maybe_ref(pack_pool_data(token_vault, currency_vault))
+        .store_uint(0, 1)
+        .end_cell();
+
+    return (state_init, calc_address(WORKCHAIN, state_init));
+}
+
+(int) validate_pool_data() {
+    return true;
+}

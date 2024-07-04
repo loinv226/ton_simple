@@ -1,22 +1,24 @@
 import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
 import { Address, Cell, Dictionary, beginCell, toNano } from '@ton/core';
-import { Master } from '../wrappers/Master';
+import { Router } from '../wrappers/Router';
 import '@ton/test-utils';
 import { compile } from '@ton/blueprint';
 import { JettonMinter } from '../wrappers/JettonMinter';
 import { JettonWallet } from '../wrappers/JettonWallet';
+import { Pool } from '../wrappers/Pool';
+import { Contributor } from '../wrappers/Contributor';
 
-describe('Master', () => {
+describe('Router', () => {
     let code: Cell;
-    let poolCode = new Cell();
+    let poolCode: Cell;
+    let contributorCode: Cell;
 
     let minter_code = new Cell();
-
     let wallet_code = new Cell();
 
     let blockchain: Blockchain;
     let deployer: SandboxContract<TreasuryContract>;
-    let master: SandboxContract<Master>;
+    let router: SandboxContract<Router>;
 
     let notDeployer: SandboxContract<TreasuryContract>;
     let jettonMinter: SandboxContract<JettonMinter>;
@@ -25,6 +27,7 @@ describe('Master', () => {
     let deployerJettonWallet: SandboxContract<JettonWallet>;
 
     let currencyJettonMinter: SandboxContract<JettonMinter>;
+    let notDeployerCurrencyWallet: SandboxContract<JettonWallet>;
 
     let defaultContent: Cell;
 
@@ -32,8 +35,10 @@ describe('Master', () => {
     let currencyWallet: (address: Address) => Promise<SandboxContract<JettonWallet>>;
 
     beforeAll(async () => {
-        code = await compile('Master');
+        code = await compile('Router');
         poolCode = await compile('Pool');
+        contributorCode = await compile('Contributor');
+
         minter_code = await compile('JettonMinter');
         wallet_code = await compile('JettonWallet');
 
@@ -130,10 +135,43 @@ describe('Master', () => {
         expect(await deployerJettonWallet.getJettonBalance()).toEqual(initialJettonBalance);
         initialTotalSupply += initialJettonBalance;
         expect(await jettonMinter.getTotalSupply()).toEqual(initialTotalSupply);
+        // mint currency
+        notDeployerCurrencyWallet = await currencyWallet(notDeployer.address);
 
-        // deploy master
-        master = blockchain.openContract(
-            Master.createFromConfig(
+        let initialTotalSupplyCurrency = await currencyJettonMinter.getTotalSupply();
+        console.log('initialTotalSupplyCurrency: ', initialTotalSupplyCurrency);
+
+        let initialJettonCurrencyBalance = toNano('100000');
+
+        // mint
+        const mintCurrencyResult = await currencyJettonMinter.sendMint(
+            notDeployer.getSender(),
+            notDeployer.address,
+            initialJettonCurrencyBalance,
+            toNano('0.06'),
+            toNano('1'),
+        );
+        // console.log('mintResult: ', mintResult);
+
+        expect(mintCurrencyResult.transactions).toHaveTransaction({
+            from: currencyJettonMinter.address,
+            on: notDeployerCurrencyWallet.address,
+            success: true,
+        });
+        expect(mintCurrencyResult.transactions).toHaveTransaction({
+            // excesses
+            from: notDeployerCurrencyWallet.address,
+            on: notDeployer.address,
+            success: true,
+        });
+
+        expect(await notDeployerCurrencyWallet.getJettonBalance()).toEqual(initialJettonCurrencyBalance);
+        initialTotalSupplyCurrency += initialJettonCurrencyBalance;
+        expect(await currencyJettonMinter.getTotalSupply()).toEqual(initialTotalSupplyCurrency);
+
+        // deploy router
+        router = blockchain.openContract(
+            Router.createFromConfig(
                 {
                     id: 0,
                     creationFee: 0,
@@ -142,16 +180,17 @@ describe('Master', () => {
                     nativeFeePercent: 0,
                     tokenFeePercent: 0,
                     poolCode,
+                    contributorCode,
                 },
                 code,
             ),
         );
 
-        const deployResult = await master.sendDeploy(deployer.getSender(), toNano('10'));
+        const deployResult = await router.sendDeploy(deployer.getSender(), toNano('10'));
 
         expect(deployResult.transactions).toHaveTransaction({
             from: deployer.address,
-            to: master.address,
+            to: router.address,
             deploy: true,
             success: true,
         });
@@ -161,18 +200,18 @@ describe('Master', () => {
 
     it('should deploy', async () => {
         // the check is done inside beforeEach
-        // blockchain and master are ready to use
+        // blockchain and router are ready to use
     });
 
-    it('should master init pool success ', async () => {
-        tokenVaultWallet = await tokenWallet(master.address);
-        currencyVaultWallet = await currencyWallet(master.address);
+    it('should init pool success ', async () => {
+        tokenVaultWallet = await tokenWallet(router.address);
+        currencyVaultWallet = await currencyWallet(router.address);
 
-        const gasAmount = toNano('5');
+        const gasAmount = toNano('20');
         const forwardTonAmount = toNano('0.24');
         let poolInitAmount = toNano('10000');
 
-        const forwardPayload = master.createInitPoolBody({
+        const forwardPayload = router.createInitPoolBody({
             currencyVault: currencyVaultWallet.address,
             start_time: 0n,
             end_time: 0n,
@@ -180,28 +219,19 @@ describe('Master', () => {
             min_contribution: 0n,
             max_contribution: 0n,
             soft_cap: 0n,
-            hard_cap: 0n,
+            hard_cap: 50n,
             rate: 0n,
             listing_percentage: 0,
             refund_type: 0,
             use_native_fee_only: 0,
         });
 
-        // const msg = createJettonTransferMessage({
-        //     queryId: 0n,
-        //     amount: poolInitAmount,
-        //     destination: master.address,
-        //     responseDestination: deployer.address,
-        //     forwardPayload,
-        //     forwardTonAmount,
-        // });
-
         // transfer
         const transferResult = await deployerJettonWallet.sendTransfer(
             deployer.getSender(),
             gasAmount,
             poolInitAmount,
-            master.address,
+            router.address,
             deployer.address,
             beginCell().endCell(),
             forwardTonAmount,
@@ -212,13 +242,64 @@ describe('Master', () => {
 
         expect(balance).toEqual(poolInitAmount);
 
-        const poolAddress = await master.getPoolAddress(tokenVaultWallet.address, currencyVaultWallet.address);
+        const poolAddress = await router.getPoolAddress(tokenVaultWallet.address, currencyVaultWallet.address);
         console.log('poolAddress: ', poolAddress);
 
         expect(transferResult.transactions).toHaveTransaction({
-            from: master.address,
+            from: router.address,
             on: poolAddress,
             deploy: true,
         });
+    });
+
+    it('should contribute success ', async () => {
+        const gasAmount = toNano('20');
+        const forwardTonAmount = toNano('2');
+        let contributeAmount = toNano('1');
+
+        const forwardPayload = router.createContributeBody({
+            tokenVault: tokenVaultWallet.address,
+            index: 0n,
+            tier: 0n,
+        });
+
+        // transfer
+        const transferResult = await notDeployerCurrencyWallet.sendTransfer(
+            notDeployer.getSender(),
+            gasAmount,
+            contributeAmount,
+            router.address,
+            notDeployer.address,
+            beginCell().endCell(),
+            forwardTonAmount,
+            forwardPayload,
+        );
+        const currencyVaultbalance = await currencyVaultWallet.getJettonBalance();
+        console.log('currencyVaultbalance: ', currencyVaultbalance);
+
+        expect(currencyVaultbalance).toEqual(contributeAmount);
+
+        const poolAddress = await router.getPoolAddress(tokenVaultWallet.address, currencyVaultWallet.address);
+        console.log('poolAddress: ', poolAddress);
+
+        expect(transferResult.transactions).toHaveTransaction({
+            from: router.address,
+            on: poolAddress,
+            success: true,
+        });
+
+        const pool = blockchain.openContract(Pool.createFromAddress(poolAddress));
+        const contributorAddress = await pool.getContributorAddress(notDeployer.address);
+        console.log('contributor: ', contributorAddress);
+
+        expect(transferResult.transactions).toHaveTransaction({
+            from: pool.address,
+            on: contributorAddress,
+            deploy: true,
+        });
+
+        const contributor = blockchain.openContract(Contributor.createFromAddress(contributorAddress));
+        const contributedAmount = await contributor.getContributeAmount();
+        console.log('contributedAmount: ', contributedAmount);
     });
 });

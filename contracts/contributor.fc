@@ -22,29 +22,52 @@
 
     slice sender_address = cs~load_msg_addr();
     force_chain(sender_address);
-    
+     
     int op = in_msg_body~load_uint(32); 
     int query_id = in_msg_body~load_uint(64);
 
     if (op == op::contribute) { 
+        
         (int c_amount, slice owner, int p_amount) = (in_msg_body~load_coins(), in_msg_body~load_msg_addr(), in_msg_body~load_coins());
-
+        
+        int is_new_purchaser = purchased_amount == 0;
+        
         contribute_amount += c_amount;
         purchased_amount += p_amount;
         
         save_data();
-
-        ;; Toodo: get wallet code            
+        
+        ;; send reward msg
         builder msg_body = begin_cell()
-                    .store_uint(op::purchase, 32)
+                    .store_uint(op::pay_to, 32)
                     .store_uint(query_id, 64)
                     .store_coins(p_amount)
-                    .store_slice(owner);
+                    .store_slice(owner)
+                    .store_uint(is_new_purchaser, 1);
+                    
+        ~dump(slice_hash(pool_address));
+        ~strdump("send msg");
 
-        send_msg(pool_address, 0, msg_body.end_cell(), msgflag::BOUNCEABLE, sendmode::CARRY_ALL_REMAINING_MESSAGE_VALUE);
+        ;; send_msg(pool_address, 0, msg_body.end_cell(), msgflag::BOUNCEABLE, sendmode::PAY_FEES_SEPARETELY | sendmode::IGNORE_ERRORS);
             
         return ();
     }
 
     throw(WRONG_OP);
+}
+
+;; Getter methods
+int get_contribute_amount() method_id {
+    load_data();
+    return contribute_amount;
+}
+
+int get_purchased_amount() method_id {
+    load_data();
+    return purchased_amount;
+}
+
+int get_claimed_amount() method_id {
+    load_data();
+    return claimed_amount;
 }

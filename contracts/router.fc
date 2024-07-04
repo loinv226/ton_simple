@@ -4,10 +4,10 @@
 #include "imports/address.fc";
 #include "imports/util.fc";
 #include "imports/jetton_utils.fc";
-#include "master/op.fc";
-#include "master/storage.fc";
-#include "master/errors.fc";
-#include "master/util.fc";
+#include "router/op.fc";
+#include "router/storage.fc";
+#include "router/errors.fc";
+#include "router/util.fc";
 
 ;; recv_internal is the main function of the contract and is called when it receives a message from other contracts
 () recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
@@ -47,7 +47,7 @@
         throw_unless(INVALID_AMOUNT, jetton_amount > 0);
 
             
-        int fwd_count = 4;
+        int fwd_count = 6;
         if ((fwd_fee * fwd_count >  msg_value)) {
             ;; refund jettons
             var body = create_simple_transfer_body(query_id, 0, jetton_amount, owner);
@@ -73,35 +73,35 @@
             ;; slice token_mint, not need
             ;; slice currency_mint, not need
             
-            (
-                int start_time,
-                int end_time,
-                int public_sale_start_time,
-                int min_contribution,
-                int max_contribution,
-                int soft_cap,
-                int hard_cap,
-                int rate,
-                int listing_percentage,
-                int refund_type,
-                int use_native_fee_only
-            ) = (
-                params_ds~load_uint(64),
-                params_ds~load_uint(64),
-                params_ds~load_uint(64),
-                params_ds~load_coins(),
-                params_ds~load_coins(),
-                params_ds~load_coins(),
-                params_ds~load_coins(),
-                params_ds~load_uint(32),
-                params_ds~load_uint(8),
-                params_ds~load_uint(8),
-                params_ds~load_uint(1)
-            );
-            
+            ;; (
+            ;;     int start_time,
+            ;;     int end_time,
+            ;;     int public_sale_start_time,
+            ;;     int min_contribution,
+            ;;     int max_contribution,
+            ;;     int soft_cap,
+            ;;     int hard_cap,
+            ;;     int rate,
+            ;;     int listing_percentage,
+            ;;     int refund_type,
+            ;;     int use_native_fee_only
+            ;; ) = (
+            ;;     params_ds~load_uint(64),
+            ;;     params_ds~load_uint(64),
+            ;;     params_ds~load_uint(64),
+            ;;     params_ds~load_coins(),
+            ;;     params_ds~load_coins(),
+            ;;     params_ds~load_coins(),
+            ;;     params_ds~load_coins(),
+            ;;     params_ds~load_uint(32),
+            ;;     params_ds~load_uint(8),
+            ;;     params_ds~load_uint(8),
+            ;;     params_ds~load_uint(1)
+            ;; );
+
             ;; Todo: check logic here
             throw_unless(INVALID_PARAMS, validate_pool_data());
-        
+
             (cell state_init, slice pool_address) = get_pool_state_init_and_address(sender_address, currency_vault);
             
             ;; create new pool
@@ -111,10 +111,9 @@
                     .store_coins(jetton_amount)
                     .store_slice(owner)
                     .store_ref(body_param);
-            ~dump(jetton_amount);
+           
 
             send_msg_with_state_init(pool_address, 0, state_init, msg_body.end_cell(), msgflag::BOUNCEABLE, sendmode::CARRY_ALL_REMAINING_MESSAGE_VALUE);
-            ~dump(slice_hash(pool_address));
             
             return ();
         }
@@ -125,8 +124,9 @@
             (int index, int tier) = (ref_ds~load_uint(64), ref_ds~load_uint(64));
             ;; Check some logic
 
-            (_, slice pool_address) = get_pool_state_init_and_address(token_vault, sender_address);
-            
+            (cell state_init, slice pool_address) = get_pool_state_init_and_address(token_vault, sender_address);
+            ~dump(slice_hash(pool_address));
+
             builder msg_body = begin_cell()
                     .store_uint(op::contribute, 32)
                     .store_uint(query_id, 64)
@@ -134,21 +134,20 @@
                     .store_slice(owner)
                     .store_uint(index, 64)
                     .store_uint(tier, 64);
-            ~dump(jetton_amount);
 
             send_msg(pool_address, 0, msg_body.end_cell(), msgflag::BOUNCEABLE, sendmode::CARRY_ALL_REMAINING_MESSAGE_VALUE);
-            
+            ;; send_msg_with_state_init(pool_address, 0, state_init, msg_body.end_cell(), msgflag::BOUNCEABLE, sendmode::CARRY_ALL_REMAINING_MESSAGE_VALUE);
             return ();
         }
             
         return ();
     }
 
-    if (op == op::purchase) {
-        (int purchase_amount, slice owner, slice token_wallet) = (in_msg_body~load_coins(), in_msg_body~load_msg_addr(), in_msg_body~load_msg_addr()); 
+    if (op == op::pay_to) {
+        (int p_amount, slice owner, slice token_wallet) = (in_msg_body~load_coins(), in_msg_body~load_msg_addr(), in_msg_body~load_msg_addr()); 
         
-        if (purchase_amount > 0) {
-            var body = create_simple_transfer_body(query_id, 0, purchase_amount, owner);
+        if (p_amount > 0) {
+            var body = create_simple_transfer_body(query_id, 0, p_amount, owner);
             send_msg(token_wallet, 0, body.end_cell(), msgflag::BOUNCEABLE, sendmode::CARRY_ALL_REMAINING_MESSAGE_VALUE | sendmode::IGNORE_ERRORS);
         }
 

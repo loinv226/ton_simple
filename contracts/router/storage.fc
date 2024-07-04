@@ -14,15 +14,16 @@ global int native_fee_only_percent;
 
 ;; pool
 global cell pool_code;
+global cell contributor_code;
 global slice authority;
 
 (slice, ()) ~load_master_config(slice s) inline {
     slice ds = s~load_ref().begin_parse();
 
-    ;; fee_receiver = ds~load_msg_addr();
-    ;; creation_fee = ds~load_uint(64);
-    ;; native_fee_percent = ds~load_uint(8);
-    ;; token_fee_percent = ds~load_uint(8);
+    fee_receiver = ds~load_msg_addr();
+    creation_fee = ds~load_coins();
+    native_fee_percent = ds~load_uint(8);
+    token_fee_percent = ds~load_uint(8);
     native_fee_only_percent = ds~load_uint(8);
     ;; operators = ds~load_dict();
     ;; currencies = ds~load_dict();
@@ -47,12 +48,14 @@ builder store_master_config(builder b) inline {
 (slice, ()) ~load_codes(slice s) impure inline {
     slice ds = s~load_ref().begin_parse();
     pool_code = ds~load_ref();
+    contributor_code = ds~load_ref();
     return (s, ());
 }
 
 builder save_codes(builder pb) inline {
     cell codes = begin_cell()
                  .store_ref(pool_code)
+                 .store_ref(contributor_code)
                  .end_cell();
     return pb.store_ref(codes);
 }

@@ -2,4 +2,4 @@
 const op::contribute = "op::contribute"c;
 const op::claim = "op::claim"c;
 
-const op::purchase = "op::purchase"c;
+const op::pay_to = "op::pay_to"c;

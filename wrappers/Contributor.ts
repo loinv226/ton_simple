@@ -1,25 +1,23 @@
 import { Address, beginCell, Cell, Contract, contractAddress, ContractProvider, Sender, SendMode } from '@ton/core';
 
 export type ContributorConfig = {
-    masterAddress: Address;
-    tokenVault: Address;
-    currencyVault: Address;
+    owner: Address;
+    pool: Address;
 };
 
-export function poolConfigToCell(config: ContributorConfig): Cell {
+export function configToCell(config: ContributorConfig): Cell {
     return beginCell()
-        .storeAddress(null)
-        .storeAddress(null)
-        .storeUint(0, 64)
-        .storeUint(0, 64)
-        .storeCoins(0)
-        .storeCoins(0)
-        .storeUint(0, 64)
+        .storeAddress(config.owner)
+        .storeAddress(config.pool)
+        .storeCoins(0) //contribute_amount
+        .storeCoins(0) //purchased_amount
+        .storeCoins(0) //claimed_amount
         .endCell();
 }
 
 export const Opcodes = {
     contribute: 0x86c74136,
+    payTo: 0x6322546b,
 };
 
 export class Contributor implements Contract {
@@ -33,7 +31,7 @@ export class Contributor implements Contract {
     }
 
     static createFromConfig(config: ContributorConfig, code: Cell, workchain = 0) {
-        const data = poolConfigToCell(config);
+        const data = configToCell(config);
         const init = { code, data };
         return new Contributor(contractAddress(workchain, init), init);
     }
@@ -46,13 +44,14 @@ export class Contributor implements Contract {
         });
     }
 
-    async sendPurchase(
+    async sendContribute(
         provider: ContractProvider,
         via: Sender,
         opts: {
             value: bigint;
-            tokenAmount: bigint;
+            contributeAmount: bigint;
             owner: Address;
+            purchaseAmount: bigint;
             queryID?: number;
         },
     ) {
@@ -60,31 +59,27 @@ export class Contributor implements Contract {
             value: opts.value,
             sendMode: SendMode.CARRY_ALL_REMAINING_INCOMING_VALUE,
             body: beginCell()
-                .storeUint(Opcodes.init_pool, 32)
+                .storeUint(Opcodes.contribute, 32)
                 .storeUint(opts.queryID ?? 0, 64)
-                .storeCoins(opts.tokenAmount)
+                .storeCoins(opts.contributeAmount)
                 .storeAddress(opts.owner)
-                .storeRef(
-                    beginCell()
-                        .storeUint(0, 64)
-                        .storeUint(0, 64)
-                        .storeUint(0, 64)
-                        .storeCoins(0)
-                        .storeCoins(0)
-                        .storeCoins(0)
-                        .storeCoins(0)
-                        .storeUint(0, 32)
-                        .storeUint(0, 8)
-                        .storeUint(0, 8)
-                        .storeUint(0, 1)
-                        .endCell(),
-                )
+                .storeCoins(opts.purchaseAmount)
                 .endCell(),
         });
     }
 
-    async getID(provider: ContractProvider) {
-        const result = await provider.get('get_id', []);
+    async getContributeAmount(provider: ContractProvider) {
+        const result = await provider.get('get_contribute_amount', []);
+        return result.stack.readNumber();
+    }
+
+    async getPurchasedAmount(provider: ContractProvider) {
+        const result = await provider.get('get_purchased_amount', []);
+        return result.stack.readNumber();
+    }
+
+    async getClaimedAmount(provider: ContractProvider) {
+        const result = await provider.get('get_claimed_amount', []);
         return result.stack.readNumber();
     }
 }

@@ -1,6 +1,6 @@
 import { Address, beginCell, Cell, Contract, contractAddress, ContractProvider, Sender, SendMode } from '@ton/core';
 
-export type MasterConfig = {
+export type RouterConfig = {
     id: number;
     feeReceiver: Address;
     creationFee: number;
@@ -10,10 +10,11 @@ export type MasterConfig = {
     // operators: Address[];
     // currencies:  Address[];
     poolCode: Cell;
+    contributorCode: Cell;
     // authority: Address;
 };
 
-export function masterConfigToCell(config: MasterConfig): Cell {
+export function masterConfigToCell(config: RouterConfig): Cell {
     const masterConfig = beginCell()
         .storeAddress(config.feeReceiver)
         .storeCoins(config.creationFee)
@@ -22,34 +23,35 @@ export function masterConfigToCell(config: MasterConfig): Cell {
         .storeUint(config.nativeFeeOnlyPercent, 8)
         .endCell();
 
-    let codes = beginCell().storeRef(config.poolCode).endCell();
+    let codes = beginCell().storeRef(config.poolCode).storeRef(config.contributorCode).endCell();
 
     return beginCell().storeUint(config.id, 32).storeRef(masterConfig).storeRef(codes).endCell();
 }
 
 export const Opcodes = {
-    init_pool: 0x38032463,
+    initPool: 0x38032463,
     contribute: 0x86c74136,
+    payTo: 0x6322546b,
     cancel: 0xcc0f2526,
     claim: 0x13a3ca6,
     emergency_withdraw: 0xf129aa95,
     finalize: 0x5b07133a,
 };
 
-export class Master implements Contract {
+export class Router implements Contract {
     constructor(
         readonly address: Address,
         readonly init?: { code: Cell; data: Cell },
     ) {}
 
     static createFromAddress(address: Address) {
-        return new Master(address);
+        return new Router(address);
     }
 
-    static createFromConfig(config: MasterConfig, code: Cell, workchain = 0) {
+    static createFromConfig(config: RouterConfig, code: Cell, workchain = 0) {
         const data = masterConfigToCell(config);
         const init = { code, data };
-        return new Master(contractAddress(workchain, init), init);
+        return new Router(contractAddress(workchain, init), init);
     }
 
     async sendDeploy(provider: ContractProvider, via: Sender, value: bigint) {
@@ -74,7 +76,7 @@ export class Master implements Contract {
             value: opts.value,
             sendMode: SendMode.PAY_GAS_SEPARATELY,
             body: beginCell()
-                .storeUint(Opcodes.init_pool, 32)
+                .storeUint(Opcodes.initPool, 32)
                 .storeUint(opts.queryID ?? 0, 64)
                 .storeUint(opts.increaseBy, 32)
                 .storeAddress(opts.pool_wallet)
@@ -100,7 +102,7 @@ export class Master implements Contract {
         customPayloadForwardGasAmount?: bigint;
     }): Cell {
         return beginCell()
-            .storeUint(Opcodes.init_pool, 32)
+            .storeUint(Opcodes.initPool, 32)
             .storeAddress(params.currencyVault)
             .storeRef(
                 beginCell()
@@ -111,7 +113,7 @@ export class Master implements Contract {
                     .storeCoins(params.max_contribution)
                     .storeCoins(params.soft_cap)
                     .storeCoins(params.hard_cap)
-                    .storeCoins(params.rate)
+                    .storeUint(params.rate, 32)
                     .storeUint(params.listing_percentage, 8)
                     .storeUint(params.refund_type, 8)
                     .storeUint(params.use_native_fee_only, 1)
@@ -119,6 +121,15 @@ export class Master implements Contract {
                     .storeMaybeRef(params.customPayload)
                     .endCell(),
             )
+            .endCell();
+    }
+
+    createContributeBody(params: { tokenVault: Address; index: bigint; tier: bigint }): Cell {
+        return beginCell()
+            .storeUint(Opcodes.contribute, 32)
+            .storeAddress(params.tokenVault)
+            .storeUint(params.index, 64)
+            .storeUint(params.tier, 64)
             .endCell();
     }
 

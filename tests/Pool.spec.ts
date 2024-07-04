@@ -10,6 +10,7 @@ import { createJettonTransferMessage } from '../utils/jetton_utils';
 
 describe('Pool', () => {
     let poolCode = new Cell();
+    let contributorCode = new Cell();
 
     let blockchain: Blockchain;
     let deployer: SandboxContract<TreasuryContract>;
@@ -21,6 +22,7 @@ describe('Pool', () => {
 
     beforeAll(async () => {
         poolCode = await compile('Pool');
+        contributorCode = await compile('Contributor');
 
         blockchain = await Blockchain.create();
 
@@ -36,6 +38,7 @@ describe('Pool', () => {
                     tokenVault: tokenVaultWallet.address,
                     currencyVault: currencyVaultWallet.address,
                     masterAddress: master.address,
+                    contributorCode: contributorCode,
                 },
                 poolCode,
             ),

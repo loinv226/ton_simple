@@ -18,23 +18,25 @@
     if (flags & 1) { ;; bounced messages
         return ();
     }
-    
+
     load_data(); ;; populate the storage variables
+    ;; return ();
 
     slice sender_address = cs~load_msg_addr();
     force_chain(sender_address);
-
+    
     int op = in_msg_body~load_uint(32); 
     int query_id = in_msg_body~load_uint(64);
 
     if (op == op::init_pool) { 
         (int amount0, slice owner_addr, cell params) = (in_msg_body~load_coins(), in_msg_body~load_msg_addr(), in_msg_body~load_ref());
-        ~dump(params);
 
         slice params_cs = params.begin_parse();
+
         ;; index = 0;
         ;; token_mint = params~load_slice(); not need
         ;; currency_mint = params~load_slice(); not need
+
         authority = owner_addr;
         start_time = params_cs~load_uint(64);
         end_time = params_cs~load_uint(64);
@@ -47,9 +49,10 @@
         listing_percentage = params_cs~load_uint(8);
         refund_type = params_cs~load_uint(8);
         params_cs~load_uint(1); ;;use_native_fee_only
+
         ;; native_fee_percent = params_cs~load_uint();
         ;; token_fee_percent = params_cs~load_uint();
-        
+
         save_data();
 
         return ();
@@ -61,7 +64,6 @@
 
         total_raised += amount;
         total_volume_purchased += amount;
-        purchaser_count += 1;
         
         save_data();
 
@@ -69,7 +71,7 @@
         (cell state_init, slice contributor) = get_contributor_state_init_and_address(owner, my_address());
             
         builder msg_body = begin_cell()
-                    .store_uint(op::init_pool, 32)
+                    .store_uint(op::contribute, 32)
                     .store_uint(query_id, 64)
                     .store_coins(amount)
                     .store_slice(owner)
@@ -80,12 +82,41 @@
         return ();
     }
 
+    ~dump(op);
+    ~strdump("go here");
+    
+    if (op == op::pay_to) { 
+        return ();
+        (int p_amount, slice owner, int is_new_purchaser) = (in_msg_body~load_coins(), in_msg_body~load_msg_addr(), in_msg_body~load_uint(1));
+
+        if (is_new_purchaser) {
+            purchaser_count += 1;
+        }
+        
+        ~dump(is_new_purchaser);
+        ~strdump("is_new_purchaser");
+
+        save_data();
+
+        ;; send token
+        builder msg_body = begin_cell()
+                    .store_uint(op::pay_to, 32)
+                    .store_uint(query_id, 64)
+                    .store_coins(p_amount)
+                    .store_slice(owner)
+                    .store_slice(token_vault);
+
+        ;; send_msg(router_address, 0, msg_body.end_cell(), msgflag::BOUNCEABLE, sendmode::CARRY_ALL_REMAINING_MESSAGE_VALUE);
+
+        return ();
+    }
+
     throw(WRONG_OP);
 }
 
 ;; get methods
 
-slice get_contributor(slice owner) method_id {
+slice get_contributor_address(slice owner) method_id {
     load_data();
     (_, slice contributor) = get_contributor_state_init_and_address(owner, my_address());
     return contributor;

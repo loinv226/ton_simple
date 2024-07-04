@@ -4,6 +4,7 @@ export type PoolConfig = {
     masterAddress: Address;
     tokenVault: Address;
     currencyVault: Address;
+    contributorCode: Cell;
 };
 
 export function poolConfigToCell(config: PoolConfig): Cell {
@@ -44,18 +45,22 @@ export function poolConfigToCell(config: PoolConfig): Cell {
         .storeUint(0, 64) // finish_time
         .storeUint(0, 64); // claim_time.endCell();
 
+    let codes = beginCell().storeRef(config.contributorCode).endCell();
+
     return beginCell()
         .storeUint(0, 32) // index
         .storeUint(0, 8) // version
+        .storeAddress(config.masterAddress)
         .storeRef(settings)
         .storeRef(state)
-        .storeAddress(config.masterAddress)
+        .storeRef(codes)
         .endCell();
 }
 
 export const Opcodes = {
     init_pool: 0x38032463,
     contribute: 0x86c74136,
+    payTo: 0x6322546b,
     cancel: 0xcc0f2526,
     claim: 0x13a3ca6,
     emergency_withdraw: 0xf129aa95,
@@ -126,5 +131,12 @@ export class Pool implements Contract {
     async getID(provider: ContractProvider) {
         const result = await provider.get('get_id', []);
         return result.stack.readNumber();
+    }
+
+    async getContributorAddress(provider: ContractProvider, owner: Address) {
+        const result = await provider.get('get_contributor_address', [
+            { type: 'slice', cell: beginCell().storeAddress(owner).endCell() },
+        ]);
+        return result.stack.readAddress();
     }
 }

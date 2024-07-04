@@ -1,10 +1,10 @@
 import { toNano } from '@ton/core';
-import { Master } from '../wrappers/Master';
+import { Router } from '../wrappers/Router';
 import { compile, NetworkProvider } from '@ton/blueprint';
 
 export async function run(provider: NetworkProvider) {
-    const master = provider.open(
-        Master.createFromConfig(
+    const router = provider.open(
+        Router.createFromConfig(
             {
                 id: Math.floor(Math.random() * 10000),
                 creationFee: 0,
@@ -13,14 +13,15 @@ export async function run(provider: NetworkProvider) {
                 nativeFeePercent: 0,
                 poolCode: await compile('Pool'),
                 tokenFeePercent: 0,
+                contributorCode: await compile('Contributor'),
             },
-            await compile('Master'),
+            await compile('Router'),
         ),
     );
 
-    await master.sendDeploy(provider.sender(), toNano('0.05'));
+    await router.sendDeploy(provider.sender(), toNano('0.05'));
 
-    await provider.waitForDeploy(master.address);
+    await provider.waitForDeploy(router.address);
 
-    console.log('ID', await master.getID());
+    console.log('ID', await router.getID());
 }

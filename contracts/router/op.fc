@@ -4,7 +4,7 @@ const transfer_notification = 0x7362d09c;
 const op::init_pool = "op::init_pool"c;
 const op::contribute = "op::contribute"c;
 
-const op::purchase = "op::purchase"c;
+const op::pay_to = "op::pay_to"c;
 
 const op::cancel = "op::cancel"c;
 const op::claim = "op::claim"c;

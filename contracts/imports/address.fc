@@ -4,6 +4,8 @@ global cell controller_code;
 global cell payout_minter_code;
 
 slice addr_none() asm "b{00} PUSHSLICE";
+;; slice addr_none() asm "<b b{00} s, b> <s PUSHSLICE";
+
 builder store_zeros(builder b, int n) asm "STZEROES";
 
 slice calc_address(int workchain, cell state_init) inline {
