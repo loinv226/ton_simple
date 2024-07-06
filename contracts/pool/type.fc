@@ -1,0 +1,3 @@
+const int POOL_STATE_ACTIVE = 0;
+const int POOL_STATE_FINALIZED = 1;
+const int POOL_STATE_CANCELED = 2;

@@ -1,11 +1,11 @@
 import { Address, beginCell, Cell, Contract, contractAddress, ContractProvider, Sender, SendMode } from '@ton/core';
 
-export type ContributorConfig = {
+export type ContributorAccountConfig = {
     owner: Address;
     pool: Address;
 };
 
-export function configToCell(config: ContributorConfig): Cell {
+export function configToCell(config: ContributorAccountConfig): Cell {
     return beginCell()
         .storeAddress(config.owner)
         .storeAddress(config.pool)
@@ -17,23 +17,23 @@ export function configToCell(config: ContributorConfig): Cell {
 
 export const Opcodes = {
     contribute: 0x86c74136,
-    payTo: 0x6322546b,
+    claim: 0x13a3ca6,
 };
 
-export class Contributor implements Contract {
+export class ContributorAccount implements Contract {
     constructor(
         readonly address: Address,
         readonly init?: { code: Cell; data: Cell },
     ) {}
 
     static createFromAddress(address: Address) {
-        return new Contributor(address);
+        return new ContributorAccount(address);
     }
 
-    static createFromConfig(config: ContributorConfig, code: Cell, workchain = 0) {
+    static createFromConfig(config: ContributorAccountConfig, code: Cell, workchain = 0) {
         const data = configToCell(config);
         const init = { code, data };
-        return new Contributor(contractAddress(workchain, init), init);
+        return new ContributorAccount(contractAddress(workchain, init), init);
     }
 
     async sendDeploy(provider: ContractProvider, via: Sender, value: bigint) {
@@ -57,13 +57,31 @@ export class Contributor implements Contract {
     ) {
         await provider.internal(via, {
             value: opts.value,
-            sendMode: SendMode.CARRY_ALL_REMAINING_INCOMING_VALUE,
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
             body: beginCell()
                 .storeUint(Opcodes.contribute, 32)
                 .storeUint(opts.queryID ?? 0, 64)
                 .storeCoins(opts.contributeAmount)
                 .storeAddress(opts.owner)
                 .storeCoins(opts.purchaseAmount)
+                .endCell(),
+        });
+    }
+
+    async sendClaim(
+        provider: ContractProvider,
+        via: Sender,
+        opts: {
+            value: bigint;
+            queryID?: number;
+        },
+    ) {
+        await provider.internal(via, {
+            value: opts.value,
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
+            body: beginCell()
+                .storeUint(Opcodes.claim, 32)
+                .storeUint(opts.queryID ?? 0, 64)
                 .endCell(),
         });
     }

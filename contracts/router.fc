@@ -125,7 +125,6 @@
             ;; Check some logic
 
             (cell state_init, slice pool_address) = get_pool_state_init_and_address(token_vault, sender_address);
-            ~dump(slice_hash(pool_address));
 
             builder msg_body = begin_cell()
                     .store_uint(op::contribute, 32)
@@ -136,19 +135,26 @@
                     .store_uint(tier, 64);
 
             send_msg(pool_address, 0, msg_body.end_cell(), msgflag::BOUNCEABLE, sendmode::CARRY_ALL_REMAINING_MESSAGE_VALUE);
-            ;; send_msg_with_state_init(pool_address, 0, state_init, msg_body.end_cell(), msgflag::BOUNCEABLE, sendmode::CARRY_ALL_REMAINING_MESSAGE_VALUE);
             return ();
         }
             
         return ();
     }
 
+    ;; for finalize + claim
     if (op == op::pay_to) {
-        (int p_amount, slice owner, slice token_wallet) = (in_msg_body~load_coins(), in_msg_body~load_msg_addr(), in_msg_body~load_msg_addr()); 
-        
-        if (p_amount > 0) {
-            var body = create_simple_transfer_body(query_id, 0, p_amount, owner);
+        (int token_amount, int currency_amount, slice owner, slice token_wallet, slice currency_walet) = (in_msg_body~load_coins(), in_msg_body~load_coins(), in_msg_body~load_msg_addr(), in_msg_body~load_msg_addr(), in_msg_body~load_msg_addr()); 
+        (_, slice pool_address) = get_pool_state_init_and_address(token_wallet, currency_walet);
+        throw_unless(INVALID_SENDER, equal_slices(sender_address, pool_address));
+
+        if (token_amount > 0) {
+            var body = create_simple_transfer_body(query_id, 0, token_amount, owner);
             send_msg(token_wallet, 0, body.end_cell(), msgflag::BOUNCEABLE, sendmode::CARRY_ALL_REMAINING_MESSAGE_VALUE | sendmode::IGNORE_ERRORS);
+        }
+
+        if (currency_amount > 0) {
+            var body = create_simple_transfer_body(query_id, 0, currency_amount, owner);
+            send_msg(currency_walet, 0, body.end_cell(), msgflag::BOUNCEABLE, sendmode::CARRY_ALL_REMAINING_MESSAGE_VALUE | sendmode::IGNORE_ERRORS);
         }
 
         return ();

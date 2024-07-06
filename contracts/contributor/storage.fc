@@ -4,7 +4,7 @@ global slice user_address;
 global slice pool_address; 
 global int contribute_amount;
 global int purchased_amount;   
-global int claimed_amount;    
+global int claimed_amount;
 
 () load_data() impure inline {
     slice ds = get_data().begin_parse();

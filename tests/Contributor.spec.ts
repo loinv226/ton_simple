@@ -2,16 +2,16 @@ import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
 import { Cell, toNano } from '@ton/core';
 import '@ton/test-utils';
 import { compile } from '@ton/blueprint';
-import { Contributor } from '../wrappers/Contributor';
+import { ContributorAccount } from '../wrappers/ContributorAccount';
 
-describe('Contributor', () => {
+describe('ContributorAccount', () => {
     let poolCode = new Cell();
     let contributorCode = new Cell();
 
     let blockchain: Blockchain;
     let deployer: SandboxContract<TreasuryContract>;
     let notDeployer: SandboxContract<TreasuryContract>;
-    let contributor: SandboxContract<Contributor>;
+    let contributorAccount: SandboxContract<ContributorAccount>;
 
     beforeAll(async () => {
         poolCode = await compile('Pool');
@@ -23,8 +23,8 @@ describe('Contributor', () => {
         notDeployer = await blockchain.treasury('notdeployer');
 
         // deploy pool
-        contributor = blockchain.openContract(
-            Contributor.createFromConfig(
+        contributorAccount = blockchain.openContract(
+            ContributorAccount.createFromConfig(
                 {
                     owner: deployer.address,
                     pool: notDeployer.address,
@@ -33,11 +33,11 @@ describe('Contributor', () => {
             ),
         );
 
-        const deployResult = await contributor.sendDeploy(deployer.getSender(), toNano('10'));
+        const deployResult = await contributorAccount.sendDeploy(deployer.getSender(), toNano('10'));
 
         expect(deployResult.transactions).toHaveTransaction({
             from: deployer.address,
-            to: contributor.address,
+            to: contributorAccount.address,
             deploy: true,
             success: true,
         });
@@ -51,7 +51,7 @@ describe('Contributor', () => {
     });
 
     it('should contribute success', async () => {
-        const txResult = await contributor.sendContribute(deployer.getSender(), {
+        const txResult = await contributorAccount.sendContribute(deployer.getSender(), {
             value: toNano('0.05'),
             owner: deployer.address,
             contributeAmount: toNano('100000'),
@@ -60,7 +60,7 @@ describe('Contributor', () => {
 
         expect(txResult.transactions).toHaveTransaction({
             from: deployer.address,
-            on: contributor.address,
+            on: contributorAccount.address,
             success: true,
         });
     });

@@ -34,21 +34,29 @@
         
         contribute_amount += c_amount;
         purchased_amount += p_amount;
-        
-        save_data();
-        
-        ;; send reward msg
-        builder msg_body = begin_cell()
-                    .store_uint(op::pay_to, 32)
-                    .store_uint(query_id, 64)
-                    .store_coins(p_amount)
-                    .store_slice(owner)
-                    .store_uint(is_new_purchaser, 1);
-                    
-        ~dump(slice_hash(pool_address));
-        ~strdump("send msg");
 
-        ;; send_msg(pool_address, 0, msg_body.end_cell(), msgflag::BOUNCEABLE, sendmode::PAY_FEES_SEPARETELY | sendmode::IGNORE_ERRORS);
+        save_data();
+
+        return ();
+    }
+
+    if (op == op::claim) { 
+        
+        throw_unless(INVALID_SENDER, equal_slices(sender_address, user_address));
+        throw_unless(INVALID_STATE, purchased_amount > 0);
+        throw_unless(INVALID_STATE, claimed_amount == 0);
+
+        claimed_amount = purchased_amount; 
+
+        save_data();
+
+        builder msg_body = begin_cell()
+                    .store_uint(op::claim, 32)
+                    .store_uint(query_id, 64)
+                    .store_coins(purchased_amount)
+                    .store_slice(sender_address);
+
+        send_msg(pool_address, 0, msg_body.end_cell(), msgflag::BOUNCEABLE, sendmode::CARRY_ALL_REMAINING_MESSAGE_VALUE);
             
         return ();
     }

@@ -103,7 +103,7 @@ export class Pool implements Contract {
     ) {
         await provider.internal(via, {
             value: opts.value,
-            sendMode: SendMode.CARRY_ALL_REMAINING_INCOMING_VALUE,
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
             body: beginCell()
                 .storeUint(Opcodes.init_pool, 32)
                 .storeUint(opts.queryID ?? 0, 64)
@@ -128,6 +128,24 @@ export class Pool implements Contract {
         });
     }
 
+    async sendFinalize(
+        provider: ContractProvider,
+        via: Sender,
+        opts: {
+            value: bigint;
+            queryID?: number;
+        },
+    ) {
+        await provider.internal(via, {
+            value: opts.value,
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
+            body: beginCell()
+                .storeUint(Opcodes.finalize, 32)
+                .storeUint(opts.queryID ?? 0, 64)
+                .endCell(),
+        });
+    }
+
     async getID(provider: ContractProvider) {
         const result = await provider.get('get_id', []);
         return result.stack.readNumber();
@@ -138,5 +156,19 @@ export class Pool implements Contract {
             { type: 'slice', cell: beginCell().storeAddress(owner).endCell() },
         ]);
         return result.stack.readAddress();
+    }
+
+    async getPoolInfo(provider: ContractProvider, owner: Address) {
+        const result = await provider.get('get_pool_info', []);
+
+        return {
+            state: result.stack.readNumber(),
+            total_raised: result.stack.readNumber(),
+            total_volume_purchased: result.stack.readNumber(),
+            purchaser_count: result.stack.readNumber(),
+            finish_time: result.stack.readNumber(),
+            claim_time: result.stack.readNumber(),
+            authority: result.stack.readAddress(),
+        };
     }
 }
