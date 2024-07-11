@@ -1,11 +1,11 @@
 import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
-import { Address, Cell, Dictionary, beginCell, toNano } from '@ton/core';
+import { Address, Cell, beginCell, toNano } from '@ton/core';
 import { Router } from '../wrappers/Router';
 import '@ton/test-utils';
 import { compile } from '@ton/blueprint';
 import { JettonMinter } from '../wrappers/JettonMinter';
 import { JettonWallet } from '../wrappers/JettonWallet';
-import { Pool } from '../wrappers/Pool';
+import { generateTierDictionary, Pool, WhitelistTier } from '../wrappers/Pool';
 import { ContributorAccount } from '../wrappers/ContributorAccount';
 
 describe('Router', () => {
@@ -260,10 +260,46 @@ describe('Router', () => {
         const forwardTonAmount = toNano('2');
         let contributeAmount = toNano('1');
 
+        const poolAddress = await router.getPoolAddress(tokenVaultWallet.address, currencyVaultWallet.address);
+        const pool = blockchain.openContract(Pool.createFromAddress(poolAddress));
+
+        // add contributor to whitelist
+        const currentSeconds = Math.floor(Date.now() / 1000);
+        const durationInSeconds = 6 * 60 * 60; // 6 hours
+        const whitelist: WhitelistTier[] = [
+            {
+                address: contributor.address,
+                tier: 1,
+                startTime: currentSeconds,
+                duration: durationInSeconds,
+            },
+        ];
+
+        const dictionary = generateTierDictionary(whitelist);
+        const tierDictCell = beginCell().storeDictDirect(dictionary).endCell();
+        const merkleRoot = BigInt('0x' + tierDictCell.hash().toString('hex'));
+
+        const proofIdx = 0n;
+        const merkleProof = dictionary.generateMerkleProof(proofIdx);
+
+        const updateTx = await pool.sendUpdatePool(poolOwner.getSender(), {
+            value: toNano('0.09'),
+            merkleRoot,
+        });
+
+        expect(updateTx.transactions).toHaveTransaction({
+            from: poolOwner.address,
+            on: pool.address,
+            success: true,
+        });
+
+        const poolInfo = await pool.getPoolInfo();
+        expect(BigInt(poolInfo.merkleRoot)).toEqual(merkleRoot);
+
         const forwardPayload = router.createContributeBody({
             tokenVault: tokenVaultWallet.address,
-            index: 0n,
-            tier: 0n,
+            index: proofIdx,
+            proof: merkleProof,
         });
 
         // transfer
@@ -282,16 +318,12 @@ describe('Router', () => {
 
         expect(currencyVaultbalance).toEqual(contributeAmount);
 
-        const poolAddress = await router.getPoolAddress(tokenVaultWallet.address, currencyVaultWallet.address);
-        console.log('poolAddress: ', poolAddress);
-
         expect(transferResult.transactions).toHaveTransaction({
             from: router.address,
             on: poolAddress,
             success: true,
         });
 
-        const pool = blockchain.openContract(Pool.createFromAddress(poolAddress));
         const contributorAddress = await pool.getContributorAddress(contributor.address);
         console.log('contributor: ', contributorAddress);
 

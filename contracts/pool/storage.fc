@@ -31,6 +31,8 @@ global int total_volume_purchased;
 global int purchaser_count;
 global int finish_time;
 global int claim_time;
+;; whitelist + tier
+global int merkle_root;
 
 ;; jetton
 ;; global slice jetton_minter;
@@ -97,7 +99,7 @@ builder store_setting(builder b) inline {
     return b.store_ref(settingBuilder.end_cell());
 }
 
-(slice, ([int, int, int, int, int, int])) ~load_pool_state(slice s) inline {
+(slice, ()) ~load_pool_state(slice s) inline {
     slice ds = s~load_ref().begin_parse();
 
     state = ds~load_uint(8);
@@ -106,9 +108,9 @@ builder store_setting(builder b) inline {
     purchaser_count = ds~load_uint(32);
     finish_time = ds~load_uint(64);
     claim_time = ds~load_uint(64);
+    merkle_root = ds~load_uint(256);
 
-    var data = [state, total_raised, total_volume_purchased, purchaser_count, finish_time, claim_time];
-    return (s, (data));
+    return (s, ());
 }
 
 builder store_state(builder b) inline {
@@ -118,7 +120,8 @@ builder store_state(builder b) inline {
     .store_coins(total_volume_purchased)
     .store_uint(purchaser_count, 32)
     .store_uint(finish_time, 64)
-    .store_uint(claim_time, 64);
+    .store_uint(claim_time, 64)
+    .store_uint(merkle_root, 256);
 
     return b.store_ref(stateBuilder.end_cell());
 }

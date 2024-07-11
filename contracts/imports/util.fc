@@ -4,3 +4,5 @@ int workchain() asm "0 PUSHINT";
       (int wc, _) = parse_std_addr(addr);
     throw_unless(333, wc == workchain());
 }
+
+(slice, int) begin_parse_exotic(cell c) asm "XCTOS";

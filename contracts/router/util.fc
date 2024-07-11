@@ -36,7 +36,8 @@ builder store_state(builder b) inline {
     .store_coins(0) ;; total_volume_purchased
     .store_uint(0, 32) ;; purchaser_count
     .store_uint(0, 64) ;; finish_time
-    .store_uint(0, 64); ;; claim_time
+    .store_uint(0, 64) ;; claim_time
+    .store_uint(0, 256); ;; merkle_root
 
     return b.store_ref(stateBuilder.end_cell());
 }

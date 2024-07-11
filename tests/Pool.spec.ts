@@ -1,6 +1,6 @@
 import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
 import { Address, Cell, Dictionary, beginCell, toNano } from '@ton/core';
-import { Pool } from '../wrappers/Pool';
+import { generateTierDictionary, Pool, WhitelistTier } from '../wrappers/Pool';
 import '@ton/test-utils';
 import { compile } from '@ton/blueprint';
 import { JettonMinter } from '../wrappers/JettonMinter';
@@ -16,18 +16,22 @@ describe('Pool', () => {
     let deployer: SandboxContract<TreasuryContract>;
     let pool: SandboxContract<Pool>;
 
-    let master: SandboxContract<TreasuryContract>;
+    let owner: SandboxContract<TreasuryContract>;
+    let contributor: SandboxContract<TreasuryContract>;
+
     let tokenVaultWallet: SandboxContract<TreasuryContract>;
     let currencyVaultWallet: SandboxContract<TreasuryContract>;
 
     beforeAll(async () => {
         poolCode = await compile('Pool');
-        contributorCode = await compile('Contributor');
+        contributorCode = await compile('ContributorAccount');
 
         blockchain = await Blockchain.create();
 
         deployer = await blockchain.treasury('deployer');
-        master = await blockchain.treasury('master');
+        owner = await blockchain.treasury('owner');
+        contributor = await blockchain.treasury('contributor');
+
         tokenVaultWallet = await blockchain.treasury('tokenVaultWallet');
         currencyVaultWallet = await blockchain.treasury('currencyVaultWallet');
 
@@ -37,7 +41,7 @@ describe('Pool', () => {
                 {
                     tokenVault: tokenVaultWallet.address,
                     currencyVault: currencyVaultWallet.address,
-                    masterAddress: master.address,
+                    masterAddress: owner.address,
                     contributorCode: contributorCode,
                 },
                 poolCode,
@@ -62,14 +66,45 @@ describe('Pool', () => {
     });
 
     it('should init pool success', async () => {
-        const initResult = await pool.sendInitPool(master.getSender(), {
+        const initResult = await pool.sendInitPool(owner.getSender(), {
             value: toNano('0.05'),
-            owner: deployer.address,
+            owner: owner.address,
             tokenAmount: toNano('100000'),
         });
 
         expect(initResult.transactions).toHaveTransaction({
-            from: master.address,
+            from: owner.address,
+            on: pool.address,
+            success: true,
+        });
+    });
+
+    it('should update pool success', async () => {
+        const currentSeconds = Math.floor(Date.now() / 1000);
+        const durationInSeconds = 6 * 60 * 60; // 6 hours
+        const whitelist: WhitelistTier[] = [
+            {
+                address: contributor.address,
+                tier: 1,
+                startTime: currentSeconds,
+                duration: durationInSeconds,
+            },
+        ];
+
+        const dictionary = generateTierDictionary(whitelist);
+        const tierDictCell = beginCell().storeDictDirect(dictionary).endCell();
+        const merkleRoot = BigInt('0x' + tierDictCell.hash().toString('hex'));
+
+        const proofIdx = 0n;
+        const merkleProof = dictionary.generateMerkleProof(proofIdx);
+
+        const updateTx = await pool.sendUpdatePool(owner.getSender(), {
+            value: toNano('0.09'),
+            merkleRoot,
+        });
+
+        expect(updateTx.transactions).toHaveTransaction({
+            from: owner.address,
             on: pool.address,
             success: true,
         });

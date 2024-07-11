@@ -1,4 +1,16 @@
-import { Address, beginCell, Cell, Contract, contractAddress, ContractProvider, Sender, SendMode } from '@ton/core';
+import {
+    Address,
+    beginCell,
+    Builder,
+    Cell,
+    Contract,
+    contractAddress,
+    ContractProvider,
+    Dictionary,
+    Sender,
+    SendMode,
+    Slice,
+} from '@ton/core';
 
 export type PoolConfig = {
     masterAddress: Address;
@@ -6,6 +18,41 @@ export type PoolConfig = {
     currencyVault: Address;
     contributorCode: Cell;
 };
+
+export type WhitelistTier = {
+    address: Address;
+    tier: number;
+    startTime: number;
+    duration: number;
+};
+
+export const whitelistTierValue = {
+    serialize: (src: WhitelistTier, buidler: Builder) => {
+        buidler
+            .storeAddress(src.address)
+            .storeUint(src.tier, 8)
+            .storeUint(src.startTime, 64)
+            .storeUint(src.duration, 32);
+    },
+    parse: (src: Slice) => {
+        return {
+            address: src.loadAddress(),
+            tier: src.loadUint(8),
+            startTime: src.loadUint(64),
+            duration: src.loadUint(32),
+        };
+    },
+};
+
+export function generateTierDictionary(entries: WhitelistTier[]): Dictionary<bigint, WhitelistTier> {
+    const dict: Dictionary<bigint, WhitelistTier> = Dictionary.empty(Dictionary.Keys.BigUint(256), whitelistTierValue);
+
+    for (let i = 0; i < entries.length; i++) {
+        dict.set(BigInt(i), entries[i]);
+    }
+
+    return dict;
+}
 
 export function poolConfigToCell(config: PoolConfig): Cell {
     let settings = beginCell()
@@ -43,7 +90,8 @@ export function poolConfigToCell(config: PoolConfig): Cell {
         .storeCoins(0) // total_volume_purchased
         .storeUint(0, 32) // purchaser_count
         .storeUint(0, 64) // finish_time
-        .storeUint(0, 64); // claim_time.endCell();
+        .storeUint(0, 64) // claim_time
+        .storeUint(0, 256); // merkle_root
 
     let codes = beginCell().storeRef(config.contributorCode).endCell();
 
@@ -63,8 +111,9 @@ export const Opcodes = {
     payTo: 0x6322546b,
     cancel: 0xcc0f2526,
     claim: 0x13a3ca6,
-    emergency_withdraw: 0xf129aa95,
+    emergencyWithdraw: 0xf129aa95,
     finalize: 0x5b07133a,
+    updatePool: 0xf8482c45,
 };
 
 export class Pool implements Contract {
@@ -146,6 +195,26 @@ export class Pool implements Contract {
         });
     }
 
+    async sendUpdatePool(
+        provider: ContractProvider,
+        via: Sender,
+        opts: {
+            value: bigint;
+            merkleRoot: bigint | null;
+            queryID?: number;
+        },
+    ) {
+        await provider.internal(via, {
+            value: opts.value,
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
+            body: beginCell()
+                .storeUint(Opcodes.updatePool, 32)
+                .storeUint(opts.queryID ?? 0, 64)
+                .storeMaybeUint(opts.merkleRoot, 256)
+                .endCell(),
+        });
+    }
+
     async getID(provider: ContractProvider) {
         const result = await provider.get('get_id', []);
         return result.stack.readNumber();
@@ -158,17 +227,18 @@ export class Pool implements Contract {
         return result.stack.readAddress();
     }
 
-    async getPoolInfo(provider: ContractProvider, owner: Address) {
+    async getPoolInfo(provider: ContractProvider) {
         const result = await provider.get('get_pool_info', []);
 
         return {
             state: result.stack.readNumber(),
-            total_raised: result.stack.readNumber(),
-            total_volume_purchased: result.stack.readNumber(),
-            purchaser_count: result.stack.readNumber(),
-            finish_time: result.stack.readNumber(),
-            claim_time: result.stack.readNumber(),
+            total_raised: result.stack.readBigNumber(),
+            total_volume_purchased: result.stack.readBigNumber(),
+            purchaser_count: result.stack.readBigNumber(),
+            finish_time: result.stack.readBigNumber(),
+            claim_time: result.stack.readBigNumber(),
             authority: result.stack.readAddress(),
+            merkleRoot: result.stack.readBigNumber(),
         };
     }
 }

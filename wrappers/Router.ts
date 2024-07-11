@@ -124,12 +124,12 @@ export class Router implements Contract {
             .endCell();
     }
 
-    createContributeBody(params: { tokenVault: Address; index: bigint; tier: bigint }): Cell {
+    createContributeBody(params: { tokenVault: Address; index: bigint; proof: Cell }): Cell {
         return beginCell()
             .storeUint(Opcodes.contribute, 32)
             .storeAddress(params.tokenVault)
             .storeUint(params.index, 64)
-            .storeUint(params.tier, 64)
+            .storeRef(params.proof)
             .endCell();
     }
 

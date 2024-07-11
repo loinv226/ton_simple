@@ -120,8 +120,7 @@
 
         if (op_fwd == op::contribute) {
             slice token_vault =  ref_ds~load_msg_addr();
-            ;;  Todo: handle proof
-            (int index, int tier) = (ref_ds~load_uint(64), ref_ds~load_uint(64));
+            (int index, cell proof) = (ref_ds~load_uint(64), ref_ds~load_ref());
             ;; Check some logic
 
             (cell state_init, slice pool_address) = get_pool_state_init_and_address(token_vault, sender_address);
@@ -132,7 +131,7 @@
                     .store_coins(jetton_amount)
                     .store_slice(owner)
                     .store_uint(index, 64)
-                    .store_uint(tier, 64);
+                    .store_ref(proof);
 
             send_msg(pool_address, 0, msg_body.end_cell(), msgflag::BOUNCEABLE, sendmode::CARRY_ALL_REMAINING_MESSAGE_VALUE);
             return ();
@@ -141,7 +140,7 @@
         return ();
     }
 
-    ;; for finalize + claim
+    ;; for finalize + claim or refund
     if (op == op::pay_to) {
         (int token_amount, int currency_amount, slice owner, slice token_wallet, slice currency_walet) = (in_msg_body~load_coins(), in_msg_body~load_coins(), in_msg_body~load_msg_addr(), in_msg_body~load_msg_addr(), in_msg_body~load_msg_addr()); 
         (_, slice pool_address) = get_pool_state_init_and_address(token_wallet, currency_walet);

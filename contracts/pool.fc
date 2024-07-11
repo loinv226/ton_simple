@@ -60,7 +60,38 @@
     }
 
     if (op == op::contribute) { 
-        (int amount, slice owner, int index, int tier) = (in_msg_body~load_coins(), in_msg_body~load_msg_addr(), in_msg_body~load_uint(64), in_msg_body~load_uint(64));
+        (int amount, slice owner, int index) = (in_msg_body~load_coins(), in_msg_body~load_msg_addr(), in_msg_body~load_uint(64));
+        ;; verify whitelist owner with tier
+        cell proof_cell = in_msg_body~load_ref();
+
+        (slice whitelist_cs, int exotic?) = proof_cell.begin_parse_exotic();
+        throw_unless(42, exotic?);
+        throw_unless(43, whitelist_cs~load_uint(8) == 3);
+        throw_unless(INVALID_WHITELIST, merkle_root == whitelist_cs~load_uint(256));
+
+        cell dict = whitelist_cs~load_ref();
+        (slice entry, int found?) = dict.udict_get?(256, index);
+        throw_unless(45, found?);
+
+        (slice user, int tier, int start_time, int duration) = (entry~load_msg_addr(), entry~load_uint(8), entry~load_uint(64), entry~load_uint(32));
+
+        if(~ equal_slices(user, owner)) {
+            ;; refund currency
+            builder msg_body = begin_cell()
+                    .store_uint(op::pay_to, 32)
+                    .store_uint(query_id, 64)
+                    .store_coins(0) ;; token
+                    .store_coins(amount)
+                    .store_slice(owner)
+                    .store_slice(token_vault)
+                    .store_slice(currency_vault);
+
+            send_msg(router_address, 0, msg_body.end_cell(), msgflag::BOUNCEABLE, sendmode::CARRY_ALL_REMAINING_MESSAGE_VALUE);
+
+            return ();
+        }
+
+        ;; save state
         int purchase_amount = amount; ;;amount * rate;
 
         total_raised += amount;
@@ -129,6 +160,19 @@
         return ();
     }
 
+    if (op == op::update_pool) { 
+        throw_unless(INVALID_SENDER, equal_slices(sender_address, authority));
+
+        int merkle_flag = in_msg_body~load_uint(1);
+        if(merkle_flag) {
+            merkle_root = in_msg_body~load_uint(256);
+        }
+        
+        save_data();
+
+        return ();
+    }
+
     throw(WRONG_OP);
 }
 
@@ -139,7 +183,8 @@ slice get_contributor_address(slice owner) method_id {
     return contributor;
 }
 
-(int, int, int, int, int, int, slice) get_pool_info() method_id { 
+(int, int, int, int, int, int, slice, int) get_pool_info() method_id { 
     load_data();
-    return (state, total_raised, total_volume_purchased, purchaser_count, finish_time, claim_time, authority);
+
+    return (state, total_raised, total_volume_purchased, purchaser_count, finish_time, claim_time, authority, merkle_root);
 }
