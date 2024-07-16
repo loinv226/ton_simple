@@ -15,7 +15,7 @@ describe('ContributorAccount', () => {
 
     beforeAll(async () => {
         poolCode = await compile('Pool');
-        contributorCode = await compile('Contributor');
+        contributorCode = await compile('ContributorAccount');
 
         blockchain = await Blockchain.create();
 

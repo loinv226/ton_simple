@@ -1,6 +1,6 @@
 import { Blockchain, SandboxContract, TreasuryContract } from '@ton/sandbox';
 import { Address, Cell, beginCell, toNano } from '@ton/core';
-import { Router } from '../wrappers/Router';
+import { Router, routerConfigToCell } from '../wrappers/Router';
 import '@ton/test-utils';
 import { compile } from '@ton/blueprint';
 import { JettonMinter } from '../wrappers/JettonMinter';
@@ -177,6 +177,7 @@ describe('Router', () => {
             Router.createFromConfig(
                 {
                     id: 0,
+                    authority: deployer.address,
                     creationFee: 0,
                     feeReceiver: poolOwner.address,
                     nativeFeeOnlyPercent: 0,
@@ -407,5 +408,52 @@ describe('Router', () => {
         const purchasedBalance = await contributorTokenWallet.getJettonBalance();
 
         expect(purchasedBalance).toEqual(BigInt(purchasedAmount));
+    });
+
+    it('Should upgrade success', async () => {
+        let new_router_code = await compile('RouterV2');
+
+        // const upgradeResult = await router.sendUpgradeCode(deployer.getSender(), {
+        //     value: toNano('0.5'),
+        //     new_code: new_router_code,
+        // });
+
+        const upgradeResult = await router.sendUpgrade(deployer.getSender(), {
+            value: toNano('0.5'),
+            new_code: new_router_code,
+            new_data: routerConfigToCell({
+                id: 0,
+                authority: deployer.address,
+                isLocked: 0,
+                contributorCode: contributorCode,
+                creationFee: 0,
+                feeReceiver: deployer.address,
+                nativeFeeOnlyPercent: 0,
+                nativeFeePercent: 0,
+                poolCode: poolCode,
+                tokenFeePercent: 0,
+            }),
+        });
+
+        expect(upgradeResult.transactions).toHaveTransaction({
+            from: deployer.address,
+            to: router.address,
+            success: true,
+        });
+
+        // send lock
+        const lockResult = await router.sendLock(deployer.getSender(), {
+            value: toNano('0.5'),
+        });
+        expect(lockResult.transactions).toHaveTransaction({
+            from: deployer.address,
+            to: router.address,
+            success: true,
+        });
+
+        // check counter
+        const info = await router.getInfo();
+        console.log('info: ', info);
+        // expect(isLocked).toBe(false);
     });
 });

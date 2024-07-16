@@ -5063,6 +5063,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "ton_simple@workspace:."
   dependencies:
+    "@orbs-network/ton-access": ^2.3.3
     "@ton-community/sandbox": ^0.11.0
     "@ton/blueprint": ^0.21.0
     "@ton/core": ~0

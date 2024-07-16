@@ -14,3 +14,5 @@ const op::finalize = "op::finalize"c;
 const op::upgrade = "op::upgrade"c;
 const op::upgrade_code = "op::upgrade_code"c;
 
+const op::lock = "op::lock"c;
+const op::unlock = "op::unlock"c;

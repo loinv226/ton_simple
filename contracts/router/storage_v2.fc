@@ -3,6 +3,7 @@
 ;; storage variables
 global int id;
 global slice authority;
+global int is_locked;
 
 ;; master config
 global slice fee_receiver;
@@ -69,6 +70,10 @@ builder save_codes(builder pb) inline {
 
     ds~load_master_config();
     ds~load_codes();
+    is_locked = ds~load_uint(1);
+    ;; if(ds.slice_bits() > 0) {
+    ;;     is_locked = ds~load_uint(1);
+    ;; }
 
     ds.end_parse();
 }
@@ -81,6 +86,7 @@ builder save_codes(builder pb) inline {
             .store_slice(authority)
             .store_master_config()
             .save_codes()
+            .store_uint(is_locked, 1)
             .end_cell()
     );
 }

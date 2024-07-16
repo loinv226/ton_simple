@@ -6,3 +6,7 @@ int workchain() asm "0 PUSHINT";
 }
 
 (slice, int) begin_parse_exotic(cell c) asm "XCTOS";
+
+() upgrade_all(cell new_data, cell new_code) impure asm
+    "SETCODE"
+    "c4 POPCTR";

@@ -4,8 +4,8 @@
 #include "imports/address.fc";
 #include "imports/util.fc";
 #include "imports/jetton_utils.fc";
-#include "router/op.fc";
-#include "router/storage.fc";
+#include "router/op_v2.fc";
+#include "router/storage_v2.fc";
 #include "router/errors.fc";
 #include "router/util.fc";
 
@@ -34,6 +34,8 @@
 
     int op = in_msg_body~load_uint(32); ;; by convention, the first 32 bits of incoming message is the op
     int query_id = in_msg_body~load_uint(64); ;; also by convention, the next 64 bits contain the "query id", although this is not always the case
+    ~dump(op);
+    ~strdump("op");
 
     if (op == transfer_notification) {
 
@@ -170,7 +172,7 @@
     }
     
     if (op == op::upgrade_code) {
-        ;; throw_unless(INVALID_SENDER, equal_slices(sender_address, authority));
+        throw_unless(INVALID_SENDER, equal_slices(sender_address, authority));
 
         cell new_code = in_msg_body~load_ref();
         set_code(new_code);
@@ -178,13 +180,31 @@
         return ();
     }
 
+    if (op == op::lock) { 
+        ~strdump("Lock");
+        is_locked = 1;
+        save_data();
+        return ();
+    }
+
+    if (op == op::unlock) { 
+        is_locked = 0;
+        save_data();
+        return ();
+    }
+
     throw(WRONG_OP);
 }
 
-;; get methods are a means to conveniently read contract data using, for example, HTTP APIs
 int get_id() method_id {
     load_data();
     return id;
+}
+
+(int, int) get_info() method_id { 
+    load_data();
+
+    return (id, is_locked);
 }
 
 cell get_pool_code() method_id {

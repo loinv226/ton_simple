@@ -23,6 +23,7 @@
         "typescript": "^5.4.5"
     },
     "dependencies": {
+        "@orbs-network/ton-access": "^2.3.3",
         "@ton-community/sandbox": "^0.11.0",
         "blueprint-scaffold": "^1.1.1"
     }

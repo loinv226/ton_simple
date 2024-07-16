@@ -2,6 +2,8 @@ import { Address, beginCell, Cell, Contract, contractAddress, ContractProvider, 
 
 export type RouterConfig = {
     id: number;
+    authority: Address;
+    isLocked?: number;
     feeReceiver: Address;
     creationFee: number;
     nativeFeePercent: number;
@@ -11,10 +13,9 @@ export type RouterConfig = {
     // currencies:  Address[];
     poolCode: Cell;
     contributorCode: Cell;
-    // authority: Address;
 };
 
-export function masterConfigToCell(config: RouterConfig): Cell {
+export function routerConfigToCell(config: RouterConfig): Cell {
     const masterConfig = beginCell()
         .storeAddress(config.feeReceiver)
         .storeCoins(config.creationFee)
@@ -25,7 +26,17 @@ export function masterConfigToCell(config: RouterConfig): Cell {
 
     let codes = beginCell().storeRef(config.poolCode).storeRef(config.contributorCode).endCell();
 
-    return beginCell().storeUint(config.id, 32).storeRef(masterConfig).storeRef(codes).endCell();
+    const builder = beginCell()
+        .storeUint(config.id, 32)
+        .storeAddress(config.authority)
+        .storeRef(masterConfig)
+        .storeRef(codes);
+
+    if (config.isLocked != null) {
+        builder.storeUint(config.isLocked, 1);
+    }
+
+    return builder.endCell();
 }
 
 export const Opcodes = {
@@ -36,6 +47,10 @@ export const Opcodes = {
     claim: 0x13a3ca6,
     emergency_withdraw: 0xf129aa95,
     finalize: 0x5b07133a,
+    upgrade: 0xdbfaf817,
+    upgradeCode: 0x61bddf8b,
+    lock: 0x683a7dab,
+    unlock: 0xf0fd50bb,
 };
 
 export class Router implements Contract {
@@ -49,7 +64,7 @@ export class Router implements Contract {
     }
 
     static createFromConfig(config: RouterConfig, code: Cell, workchain = 0) {
-        const data = masterConfigToCell(config);
+        const data = routerConfigToCell(config);
         const init = { code, data };
         return new Router(contractAddress(workchain, init), init);
     }
@@ -80,6 +95,84 @@ export class Router implements Contract {
                 .storeUint(opts.queryID ?? 0, 64)
                 .storeUint(opts.increaseBy, 32)
                 .storeAddress(opts.pool_wallet)
+                .endCell(),
+        });
+    }
+
+    async sendUpgrade(
+        provider: ContractProvider,
+        via: Sender,
+        opts: {
+            value: bigint;
+            new_code: Cell;
+            new_data: Cell;
+            queryID?: number;
+        },
+    ) {
+        await provider.internal(via, {
+            value: opts.value,
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
+            body: beginCell()
+                .storeUint(Opcodes.upgrade, 32)
+                .storeUint(opts.queryID ?? 0, 64)
+                .storeRef(opts.new_code)
+                .storeRef(opts.new_data)
+                .endCell(),
+        });
+    }
+
+    async sendUpgradeCode(
+        provider: ContractProvider,
+        via: Sender,
+        opts: {
+            value: bigint;
+            new_code: Cell;
+            queryID?: number;
+        },
+    ) {
+        await provider.internal(via, {
+            value: opts.value,
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
+            body: beginCell()
+                .storeUint(Opcodes.upgradeCode, 32)
+                .storeUint(opts.queryID ?? 0, 64)
+                .storeRef(opts.new_code)
+                .endCell(),
+        });
+    }
+
+    async sendLock(
+        provider: ContractProvider,
+        via: Sender,
+        opts: {
+            value: bigint;
+            queryID?: number;
+        },
+    ) {
+        await provider.internal(via, {
+            value: opts.value,
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
+            body: beginCell()
+                .storeUint(Opcodes.lock, 32)
+                .storeUint(opts.queryID ?? 0, 64)
+                .endCell(),
+        });
+    }
+
+    async sendUnLock(
+        provider: ContractProvider,
+        via: Sender,
+        opts: {
+            value: bigint;
+            queryID?: number;
+        },
+    ) {
+        await provider.internal(via, {
+            value: opts.value,
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
+            body: beginCell()
+                .storeUint(Opcodes.unlock, 32)
+                .storeUint(opts.queryID ?? 0, 64)
                 .endCell(),
         });
     }
@@ -136,6 +229,14 @@ export class Router implements Contract {
     async getID(provider: ContractProvider) {
         const result = await provider.get('get_id', []);
         return result.stack.readNumber();
+    }
+
+    async getInfo(provider: ContractProvider) {
+        const result = await provider.get('get_info', []);
+        return {
+            id: result.stack.readNumber(),
+            isLocked: result.stack.pop(),
+        };
     }
 
     async getPoolAddress(provider: ContractProvider, token_vault: Address, currency_vault: Address) {
