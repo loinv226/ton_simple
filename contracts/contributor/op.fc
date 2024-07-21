@@ -1,3 +1,4 @@
 
 const op::contribute = "op::contribute"c;
 const op::claim = "op::claim"c;
+const op::emergency_withdraw = "op::emergency_withdraw"c;

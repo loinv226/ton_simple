@@ -18,6 +18,7 @@ export function configToCell(config: ContributorAccountConfig): Cell {
 export const Opcodes = {
     contribute: 0x86c74136,
     claim: 0x13a3ca6,
+    emergencyWithdraw: 0xf129aa95,
 };
 
 export class ContributorAccount implements Contract {

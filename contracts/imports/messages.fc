@@ -110,8 +110,6 @@ builder store_masterchain_address(builder b, int address_hash) inline {
         sendmode::CARRY_ALL_REMAINING_MESSAGE_VALUE | sendmode::IGNORE_ERRORS); ;; non-bouneable, remaining inbound message amount, fee deducted from amount, ignore errors
 }
 
-
-
 () emit_log (int topic, builder data) impure inline {
     ;; 1023 - (4+2+9+256+64+32+2) = 654 bit free
 

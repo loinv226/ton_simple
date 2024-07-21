@@ -1,0 +1,3 @@
+[submodule "contracts/pton/pton-contracts"]
+	path = contracts/pton/pton-contracts
+	url = https://github.com/ston-fi/pton-contracts.git

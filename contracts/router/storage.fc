@@ -4,6 +4,7 @@
 global int ctx_id;
 
 ;; master config
+;; global slice ton_wallet;
 global slice fee_receiver;
 global int creation_fee;
 global int native_fee_percent;
@@ -20,6 +21,7 @@ global slice authority;
 (slice, ()) ~load_master_config(slice s) inline {
     slice ds = s~load_ref().begin_parse();
 
+    ;; ton_wallet = ds~load_msg_addr();
     fee_receiver = ds~load_msg_addr();
     creation_fee = ds~load_coins();
     native_fee_percent = ds~load_uint(8);
@@ -33,6 +35,7 @@ global slice authority;
 
 builder store_master_config(builder b) inline {
     cell configCell = begin_cell()
+    ;;  .store_slice(ton_wallet)
      .store_slice(fee_receiver)
      .store_coins(creation_fee)
      .store_uint(native_fee_percent, 8)

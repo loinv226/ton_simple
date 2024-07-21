@@ -5,3 +5,5 @@ dist
 .DS_Store
 .yarn/*
 TODO.md
+contracts_build/
+.env

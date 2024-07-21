@@ -153,7 +153,7 @@
 
         if (currency_amount > 0) {
             var body = create_simple_transfer_body(query_id, 0, currency_amount, owner);
-            send_msg(currency_walet, 0, body.end_cell(), msgflag::BOUNCEABLE, sendmode::CARRY_ALL_REMAINING_MESSAGE_VALUE | sendmode::IGNORE_ERRORS);
+            send_msg(currency_walet, 0, body.end_cell(), msgflag::BOUNCEABLE, sendmode::CARRY_ALL_REMAINING_MESSAGE_VALUE);
         }
 
         return ();

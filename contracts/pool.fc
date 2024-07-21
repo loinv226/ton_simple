@@ -160,6 +160,52 @@
         return ();
     }
 
+    if (op == op::cancel) {
+        throw_unless(INVALID_SENDER, equal_slices(sender_address, authority));
+        throw_unless(INVALID_STATE, state == POOL_STATE_ACTIVE);
+
+        state = POOL_STATE_CANCELED;
+        finish_time = now();
+
+        save_data();
+
+        ;; send msg claim token
+        builder msg_body = begin_cell()
+                    .store_uint(op::pay_to, 32)
+                    .store_uint(query_id, 64)
+                    .store_coins(0) ;; token
+                    .store_coins(0)
+                    .store_slice(sender_address)
+                    .store_slice(token_vault)
+                    .store_slice(currency_vault);
+
+        send_msg(router_address, 0, msg_body.end_cell(), msgflag::BOUNCEABLE, sendmode::CARRY_ALL_REMAINING_MESSAGE_VALUE);
+
+        return ();
+    }
+
+    if (op == op::emergency_withdraw) { 
+        (int c_amount, slice owner) = (in_msg_body~load_coins(), in_msg_body~load_msg_addr());
+        (_, slice contributor) = get_contributor_state_init_and_address(owner, my_address());
+        throw_unless(INVALID_SENDER, equal_slices(sender_address, contributor));
+
+        save_data();
+
+        ;; send msg claim currency
+        builder msg_body = begin_cell()
+                    .store_uint(op::pay_to, 32)
+                    .store_uint(query_id, 64)
+                    .store_coins(0)
+                    .store_coins(c_amount) ;; currency
+                    .store_slice(owner)
+                    .store_slice(token_vault)
+                    .store_slice(currency_vault);
+
+        send_msg(router_address, 0, msg_body.end_cell(), msgflag::BOUNCEABLE, sendmode::CARRY_ALL_REMAINING_MESSAGE_VALUE);
+
+        return ();
+    }
+
     if (op == op::update_pool) { 
         throw_unless(INVALID_SENDER, equal_slices(sender_address, authority));
 
